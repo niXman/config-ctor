@@ -75,7 +75,11 @@ template<>
 struct print_value<true> {
 	template<typename T>
 	static void print(const T &v, std::ostream &os) {
-		os << v;
+		if ( std::is_same<T, bool>::value ) {
+			os << (v ? "true" : "false");
+		} else {
+			os << v;
+		}
 	}
 };
 
