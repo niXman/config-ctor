@@ -23,6 +23,7 @@
 /***************************************************************************/
 
 namespace construct_config {
+
 static std::size_t format_size(std::string str) {
 	const char s = str.back();
 
@@ -62,6 +63,22 @@ static T get_value(const char *key, const boost::property_tree::ptree &cfg) {
 	return get_concrete_value<is_numeric>::template get<TT>(key, cfg);
 }
 
+template<bool ok>
+struct print_value {
+	template<typename T>
+	static void print(const T &v, std::ostream &os) {
+		os << '\"' << v << '\"';
+	}
+};
+
+template<>
+struct print_value<true> {
+	template<typename T>
+	static void print(const T &v, std::ostream &os) {
+		os << v;
+	}
+};
+
 } // ns construct_config
 
 /***************************************************************************/
@@ -91,8 +108,11 @@ static T get_value(const char *key, const boost::property_tree::ptree &cfg) {
 		)
 
 #define _CONSTRUCT_CONFIG__ENUM_MEMBERS(unused, data, idx, elem) \
-	os << BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(0, elem)) "=\"" \
-		<< BOOST_PP_TUPLE_ELEM(0, elem) << "\"" << std::endl;
+	os << BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(0, elem)) "="; \
+	::construct_config::print_value< \
+		std::is_integral<decltype(BOOST_PP_TUPLE_ELEM(0, elem))>::value \
+	>::print(BOOST_PP_TUPLE_ELEM(0, elem), os); \
+	os << std::endl;
 
 /***************************************************************************/
 
