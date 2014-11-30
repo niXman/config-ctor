@@ -27,7 +27,7 @@ namespace construct_config {
 static std::size_t format_size(std::string str) {
 	const char s = str.back();
 
-	std::size_t mult = 1;
+	std::size_t mult = 1u;
 	switch ( s ) {
 		case 'g': mult *= 1024u;
 		case 'm': mult *= 1024u;
@@ -166,7 +166,7 @@ struct print_value<true> {
 				,seq \
 			) \
 			boost::property_tree::write_##fmt(fname, ptree); \
-		}\
+		} \
 		static void write(std::ostream &os, const name &cfg) { \
 			boost::property_tree::ptree ptree; \
 			BOOST_PP_SEQ_FOR_EACH_I( \
@@ -175,7 +175,7 @@ struct print_value<true> {
 				,seq \
 			) \
 			boost::property_tree::write_##fmt(os, ptree); \
-		}\
+		} \
 		\
 		void dump(std::ostream &os) const { \
 			BOOST_PP_SEQ_FOR_EACH_I( \
@@ -183,7 +183,7 @@ struct print_value<true> {
 				,~ \
 				,seq \
 			) \
-		}\
+		} \
 	};
 
 /***************************************************************************/
