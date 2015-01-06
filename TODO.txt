@@ -1,1 +1,1 @@
-1. Add the ability to cpecify the default values
+1. Add the ability to specify the default values
