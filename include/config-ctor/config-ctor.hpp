@@ -101,9 +101,6 @@ struct print_value<true> {
 	BOOST_PP_TUPLE_ENUM(BOOST_PP_TUPLE_POP_FRONT(elem)) /* type */ \
 		BOOST_PP_TUPLE_ELEM(0, elem); /* var name */
 
-#define _CONSTRUCT_CONFIG__GENERATE_INITIALIZER_LIST(unused, data, idx, elem) \
-	BOOST_PP_COMMA_IF(idx) BOOST_PP_TUPLE_ELEM(0, elem) ()
-
 #define _CONSTRUCT_CONFIG__INIT_MEMBERS(unused, data, idx, elem) \
 	BOOST_PP_COMMA_IF(idx) \
 		::construct_config::get_value<BOOST_PP_TUPLE_ENUM(BOOST_PP_TUPLE_POP_FRONT(elem))>( \
