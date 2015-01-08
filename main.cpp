@@ -9,6 +9,10 @@
 		std::abort(); \
 	}
 
+#define DUMP_CONFIG(os, ss, descr) \
+	os << "[" descr "]:" << std::endl; \
+	os << ss.str() << std::endl;
+
 /***************************************************************************/
 
 int main() {
@@ -32,6 +36,7 @@ int main() {
 
 		std::stringstream ss;
 		config::write(ss, wcfg);
+		DUMP_CONFIG(std::cout, ss, "test 'ini' config dump")
 
 		const config rcfg = config::read(ss);
 		MY_ASSERT(rcfg.a == a);
@@ -58,6 +63,7 @@ int main() {
 
 		std::stringstream ss;
 		config::write(ss, wcfg);
+		DUMP_CONFIG(std::cout, ss, "test 'json' config dump")
 
 		const config rcfg = config::read(ss);
 		MY_ASSERT(rcfg.a == a);
@@ -84,6 +90,7 @@ int main() {
 
 		std::stringstream ss;
 		config::write(ss, wcfg);
+		DUMP_CONFIG(std::cout, ss, "test 'xml' config dump")
 
 		const config rcfg = config::read(ss);
 		MY_ASSERT(rcfg.a == a);
@@ -110,6 +117,7 @@ int main() {
 
 		std::stringstream ss;
 		config::write(ss, wcfg);
+		DUMP_CONFIG(std::cout, ss, "test 'info' config dump")
 
 		const config rcfg = config::read(ss);
 		MY_ASSERT(rcfg.a == a);
@@ -118,28 +126,26 @@ int main() {
 	}
 	//////////////////////////////////////////////// default value test
 	{
-		{
-			CONSTRUCT_INI_CONFIG(
-				config,
-				(int, a)
-				(bool, b, false)
-				(float, c, 22)
-				(std::string, d)
-			)
+		CONSTRUCT_INI_CONFIG(
+			config,
+			(int, a)
+			(bool, b, false)
+			(float, c, 22)
+			(std::string, d)
+		)
 
-			static const int a = 33;
-			static const std::string d = "string";
+		static const int a = 33;
+		static const std::string d = "string";
 
-			std::stringstream ss;
-			ss << "a=" << a << std::endl
-				<< "d=" << d << std::endl;
+		std::stringstream ss;
+		ss << "a=" << a << std::endl
+			<< "d=" << d << std::endl;
 
-			const config rcfg = config::read(ss);
-			MY_ASSERT(rcfg.a == a);
-			MY_ASSERT(rcfg.b == false);
-			MY_ASSERT(rcfg.c == 22);
-			MY_ASSERT(rcfg.d == d);
-		}
+		const config rcfg = config::read(ss);
+		MY_ASSERT(rcfg.a == a);
+		MY_ASSERT(rcfg.b == false);
+		MY_ASSERT(rcfg.c == 22);
+		MY_ASSERT(rcfg.d == d);
 	}
 }
 
