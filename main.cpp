@@ -2,7 +2,12 @@
 #include <config-ctor/config-ctor.hpp>
 
 #include <iostream>
-#include <cassert>
+
+#define MY_ASSERT(...) \
+	if ( !(__VA_ARGS__) ) { \
+		std::cerr << "expression error(" __FILE__ ":" BOOST_PP_STRINGIZE(__LINE__) "): \"" #__VA_ARGS__ "\"" << std::endl; \
+		std::abort(); \
+	}
 
 /***************************************************************************/
 
@@ -11,9 +16,9 @@ int main() {
 	{
 		CONSTRUCT_INI_CONFIG(
 			config,
-			(a, int)
-			(b, float)
-			(c, std::string)
+			(int, a)
+			(float, b)
+			(std::string, c)
 		)
 
 		static const int a = 33;
@@ -29,17 +34,17 @@ int main() {
 		config::write(ss, wcfg);
 
 		const config rcfg = config::read(ss);
-		assert(rcfg.a == a);
-		assert(rcfg.b == b);
-		assert(rcfg.c == c);
+		MY_ASSERT(rcfg.a == a);
+		MY_ASSERT(rcfg.b == b);
+		MY_ASSERT(rcfg.c == c);
 	}
 	//////////////////////////////////////////////// json
 	{
 		CONSTRUCT_JSON_CONFIG(
 			config,
-			(a, double)
-			(b, long)
-			(c, std::uint16_t)
+			(double, a)
+			(long, b)
+			(std::uint16_t, c)
 		)
 
 		static const double a = 33.44;
@@ -55,17 +60,17 @@ int main() {
 		config::write(ss, wcfg);
 
 		const config rcfg = config::read(ss);
-		assert(rcfg.a == a);
-		assert(rcfg.b == b);
-		assert(rcfg.c == c);
+		MY_ASSERT(rcfg.a == a);
+		MY_ASSERT(rcfg.b == b);
+		MY_ASSERT(rcfg.c == c);
 	}
 	//////////////////////////////////////////////// xml
 	{
 		CONSTRUCT_XML_CONFIG(
 			config,
-			(a, double)
-			(b, long)
-			(c, std::uint16_t)
+			(double, a)
+			(long, b)
+			(std::uint16_t, c)
 		)
 
 		static const double a = 33.44;
@@ -81,17 +86,17 @@ int main() {
 		config::write(ss, wcfg);
 
 		const config rcfg = config::read(ss);
-		assert(rcfg.a == a);
-		assert(rcfg.b == b);
-		assert(rcfg.c == c);
+		MY_ASSERT(rcfg.a == a);
+		MY_ASSERT(rcfg.b == b);
+		MY_ASSERT(rcfg.c == c);
 	}
 	//////////////////////////////////////////////// info
 	{
 		CONSTRUCT_INFO_CONFIG(
 			config,
-			(a, double)
-			(b, long)
-			(c, std::uint16_t)
+			(double, a)
+			(long, b)
+			(std::uint16_t, c)
 		)
 
 		static const double a = 33.44;
@@ -107,9 +112,34 @@ int main() {
 		config::write(ss, wcfg);
 
 		const config rcfg = config::read(ss);
-		assert(rcfg.a == a);
-		assert(rcfg.b == b);
-		assert(rcfg.c == c);
+		MY_ASSERT(rcfg.a == a);
+		MY_ASSERT(rcfg.b == b);
+		MY_ASSERT(rcfg.c == c);
+	}
+	//////////////////////////////////////////////// default value test
+	{
+		{
+			CONSTRUCT_INI_CONFIG(
+				config,
+				(int, a)
+				(bool, b, false)
+				(float, c, 22)
+				(std::string, d)
+			)
+
+			static const int a = 33;
+			static const std::string d = "string";
+
+			std::stringstream ss;
+			ss << "a=" << a << std::endl
+				<< "d=" << d << std::endl;
+
+			const config rcfg = config::read(ss);
+			MY_ASSERT(rcfg.a == a);
+			MY_ASSERT(rcfg.b == false);
+			MY_ASSERT(rcfg.c == 22);
+			MY_ASSERT(rcfg.d == d);
+		}
 	}
 }
 

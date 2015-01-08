@@ -13,54 +13,74 @@
 #include <boost/property_tree/xml_parser.hpp>
 
 #include <boost/preprocessor/cat.hpp>
+#include <boost/preprocessor/comparison/greater_equal.hpp>
+#include <boost/preprocessor/control/if.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/punctuation/comma_if.hpp>
 #include <boost/preprocessor/seq/for_each_i.hpp>
+#include <boost/preprocessor/tuple/size.hpp>
 #include <boost/preprocessor/tuple/elem.hpp>
-#include <boost/preprocessor/tuple/enum.hpp>
-#include <boost/preprocessor/tuple/pop_front.hpp>
 
 /***************************************************************************/
 
 namespace construct_config {
+namespace {
 
-static std::size_t format_size(std::string str) {
-	const char s = str.back();
-
-	std::size_t mult = 1u;
-	switch ( s ) {
-		case 'g': mult *= 1024u;
-		case 'm': mult *= 1024u;
-		case 'k': mult *= 1024u;
-
-		str.pop_back();
-	}
-
-	return std::stoul(str)*mult;
-}
-
+// for other types (strings)
 template<bool ok>
 struct get_concrete_value {
 	template<typename T>
-	static T get(const char *key, const boost::property_tree::ptree &ini) {
-		return ini.get<T>(key);
+	static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
+		return default_value != nullptr
+			? ini.get<T>(key, default_value)
+			: ini.get<T>(key)
+		;
 	}
 };
 
+// specialization for arithmetic types
 template<>
 struct get_concrete_value<true> {
 	template<typename T>
-	static T get(const char *key, const boost::property_tree::ptree &ini) {
-		const std::string val = ini.get<std::string>(key);
-		return format_size(val);
+	static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
+		// handle bool types
+		if ( std::is_same<T, bool>::value ) {
+			return default_value != nullptr
+				? ini.get<bool>(key, (std::strcmp(default_value, "true") == 0))
+				: ini.get<bool>(key)
+			;
+		}
+
+		// handle other arithmetic types
+		std::string val = default_value != nullptr
+			? ini.get<std::string>(key, default_value)
+			: ini.get<std::string>(key)
+		;
+		if ( val.empty() ) return T{};
+
+		if ( (std::is_signed<T>::value || std::is_unsigned<T>::value) && !std::is_floating_point<T>::value ) {
+			std::size_t mult = 1u;
+			switch ( val.back() ) {
+				case 'G': mult *= 1024u;
+				case 'M': mult *= 1024u;
+				case 'K': mult *= 1024u;
+
+				val.pop_back();
+			}
+
+			return (std::is_signed<T>::value ? std::stol(val) : std::stoul(val));
+		}
+
+		return std::stod(val);
 	}
 };
 
+} // anon ns
+
 template<typename T>
-static T get_value(const char *key, const boost::property_tree::ptree &cfg) {
-	using TT = typename std::remove_const<T>::type;
-	enum { is_numeric = std::is_integral<TT>::value && !std::is_same<TT, bool>::value };
-	return get_concrete_value<is_numeric>::template get<TT>(key, cfg);
+static T get_value(const char *key, const boost::property_tree::ptree &cfg, const char *default_value) {
+	using TT = typename std::remove_cv<T>::type;
+	return get_concrete_value<std::is_arithmetic<TT>::value>::template get<TT>(key, cfg, default_value);
 }
 
 template<bool ok>
@@ -75,11 +95,7 @@ template<>
 struct print_value<true> {
 	template<typename T>
 	static void print(const T &v, std::ostream &os) {
-		if ( std::is_same<T, bool>::value ) {
-			os << (v ? "true" : "false");
-		} else {
-			os << v;
-		}
+		os << std::boolalpha << v;
 	}
 };
 
@@ -98,27 +114,37 @@ struct print_value<true> {
 /***************************************************************************/
 
 #define _CONSTRUCT_CONFIG__GENERATE_MEMBERS(unused, data, idx, elem) \
-	BOOST_PP_TUPLE_ENUM(BOOST_PP_TUPLE_POP_FRONT(elem)) /* type */ \
-		BOOST_PP_TUPLE_ELEM(0, elem); /* var name */
+	BOOST_PP_TUPLE_ELEM(0, elem) /* type */ BOOST_PP_TUPLE_ELEM(1, elem) /* var name */ ;
+
+#define _CONSTRUCT_CONFIG__INIT_MEMBERS_WITH_DEFAULT(...) \
+	,BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2, __VA_ARGS__))
+
+#define _CONSTRUCT_CONFIG__INIT_MEMBERS_WITHOUT_DEFAULT(...) \
+	,nullptr
 
 #define _CONSTRUCT_CONFIG__INIT_MEMBERS(unused, data, idx, elem) \
 	BOOST_PP_COMMA_IF(idx) \
-		::construct_config::get_value<BOOST_PP_TUPLE_ENUM(BOOST_PP_TUPLE_POP_FRONT(elem))>( \
-			BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(0, elem)) \
+		::construct_config::get_value<BOOST_PP_TUPLE_ELEM(0, elem)>( \
+			 BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) \
 			,cfg \
+			BOOST_PP_IF( \
+				 BOOST_PP_GREATER_EQUAL(BOOST_PP_TUPLE_SIZE(elem), 3) \
+				,_CONSTRUCT_CONFIG__INIT_MEMBERS_WITH_DEFAULT \
+				,_CONSTRUCT_CONFIG__INIT_MEMBERS_WITHOUT_DEFAULT \
+			)(elem) \
 		)
 
 #define _CONSTRUCT_CONFIG__ENUM_MEMBERS(unused, data, idx, elem) \
-	os << BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(0, elem)) "="; \
+	os << BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) "="; \
 	::construct_config::print_value< \
-		std::is_integral<decltype(BOOST_PP_TUPLE_ELEM(0, elem))>::value \
-	>::print(BOOST_PP_TUPLE_ELEM(0, elem), os); \
+		std::is_integral<decltype(BOOST_PP_TUPLE_ELEM(1, elem))>::value \
+	>::print(BOOST_PP_TUPLE_ELEM(1, elem), os); \
 	os << std::endl;
 
 /***************************************************************************/
 
 #define _CONSTRUCT_CONFIG__ENUM_WRITE_MEMBERS(unused, data, idx, elem) \
-	ptree.put(BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(0, elem)), cfg.BOOST_PP_TUPLE_ELEM(0, elem));
+	ptree.put(BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)), cfg.BOOST_PP_TUPLE_ELEM(1, elem));
 
 /***************************************************************************/
 
