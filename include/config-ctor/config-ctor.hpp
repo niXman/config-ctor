@@ -137,7 +137,7 @@ struct print_value<true> {
 #define _CONSTRUCT_CONFIG__ENUM_MEMBERS(unused, data, idx, elem) \
 	os << BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) "="; \
 	::construct_config::print_value< \
-		std::is_integral<decltype(BOOST_PP_TUPLE_ELEM(1, elem))>::value \
+		std::is_arithmetic<decltype(BOOST_PP_TUPLE_ELEM(1, elem))>::value \
 	>::print(BOOST_PP_TUPLE_ELEM(1, elem), os); \
 	os << std::endl;
 
