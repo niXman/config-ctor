@@ -132,6 +132,7 @@ int main() {
 			(bool, b, false)
 			(float, c, 22)
 			(std::string, d)
+			(std::string, e, /path/to/some/file.ext)
 		)
 
 		static const int a = 33;
@@ -146,6 +147,7 @@ int main() {
 		MY_ASSERT(rcfg.b == false);
 		MY_ASSERT(rcfg.c == 22);
 		MY_ASSERT(rcfg.d == d);
+		MY_ASSERT(rcfg.e == "/path/to/some/file.ext");
 	}
 }
 
