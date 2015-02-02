@@ -21,7 +21,7 @@ before_install:
   - tar jxf boost_1_50_0.tar.bz2
   - cd boost_1_50_0
   - ./bootstrap.sh
-  - sudo ./bjam release install -d0 --with-chrono --with-container --prefix=/usr/local -j4
+  - sudo ./bjam release install -d0 --with-chrono --prefix=/usr/local -j4
   - sudo ldconfig
 
 install:
