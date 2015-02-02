@@ -149,6 +149,8 @@ int main() {
 		MY_ASSERT(rcfg.d == d);
 		MY_ASSERT(rcfg.e == "/path/to/some/file.ext");
 	}
+	
+	return EXIT_SUCCESS;
 }
 
 /***************************************************************************/
