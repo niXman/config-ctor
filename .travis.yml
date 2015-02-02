@@ -17,6 +17,9 @@ before_install:
   - sudo apt-get install g++-4.9 libboost-dev cmake
   - if [[ -f /usr/bin/g++ ]]; then sudo rm /usr/bin/g++; fi
   - sudo ln /usr/bin/g++-4.9 /usr/bin/g++
+  - wget http://sourceforge.net/projects/boost/files/boost/1.57.0/boost_1_57_0.tar.bz2
+  - tar jxf boost_1_57_0.tar.bz2
+  - cp -rf boost_1_57_0/boost/preprocessor/* /usr/include/boost/preprocessor/
 
 install:
   - mkdir -p $TRAVIS_BUILD_DIR/build
