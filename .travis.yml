@@ -14,7 +14,7 @@ notifications:
 before_install:
   - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
   - sudo apt-get update
-  - sudo apt-get install g++-4.8 libboost-dev cmake
+  - sudo apt-get install g++-4.9 libboost-dev cmake
 
 install:
   - mkdir -p $TRAVIS_BUILD_DIR/build
