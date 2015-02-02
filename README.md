@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/niXman/config-ctor.svg?branch=master)](https://travis-ci.org/niXman/config-ctor)
+
 config-ctor
 ===========
 
