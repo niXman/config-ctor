@@ -18,7 +18,7 @@ before_install:
 
 install:
   - mkdir -p $TRAVIS_BUILD_DIR/build
-  - cd $TRAVIS_BUILD_DIR
+  - cd $TRAVIS_BUILD_DIR/build
   - cmake ..
 
 script:
