@@ -133,6 +133,7 @@ int main() {
 			(float, c, 22)
 			(std::string, d)
 			(std::string, e, /path/to/some/file.ext)
+			(long, f)
 		)
 
 		static const int a = 33;
@@ -140,7 +141,8 @@ int main() {
 
 		std::stringstream ss;
 		ss << "a=" << a << std::endl
-			<< "d=" << d << std::endl;
+			<< "d=" << d << std::endl
+			<< "f=64k" << std::endl;
 
 		const config rcfg = config::read(ss);
 		MY_ASSERT(rcfg.a == a);
@@ -148,6 +150,7 @@ int main() {
 		MY_ASSERT(rcfg.c == 22);
 		MY_ASSERT(rcfg.d == d);
 		MY_ASSERT(rcfg.e == "/path/to/some/file.ext");
+		MY_ASSERT(rcfg.f == 64*1024);
 	}
 	
 	return EXIT_SUCCESS;
