@@ -3,7 +3,7 @@
 config-ctor
 ===========
 
-Configuration reader/writer constructor based on boost.property_tree.
+Configuration reader/writer constructor based on [boost.property_tree](http://www.boost.org/doc/libs/1_59_0/libs/property_tree/index.html).
 
 Currently the `ini`, `json`, `xml`, `info` formats are supported.
 
