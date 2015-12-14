@@ -61,6 +61,7 @@ struct get_concrete_value<true> {
 		if ( (std::is_signed<T>::value || std::is_unsigned<T>::value) && !std::is_floating_point<T>::value ) {
 			std::size_t mult = 1u;
 			switch ( val.back() ) {
+				case 't': case 'T': mult *= 1024u;
 				case 'g': case 'G': mult *= 1024u;
 				case 'm': case 'M': mult *= 1024u;
 				case 'k': case 'K': mult *= 1024u;
