@@ -69,10 +69,10 @@ struct get_concrete_value<true> {
 				val.pop_back();
 			}
 
-			return (std::is_signed<T>::value ? std::stol(val) : std::stoul(val)) * mult;
+			return static_cast<T>((std::is_signed<T>::value ? std::stol(val) : std::stoul(val)) * mult);
 		}
 
-		return std::stod(val);
+		return static_cast<T>(std::stod(val));
 	}
 };
 
