@@ -21,6 +21,10 @@
 #include <boost/preprocessor/tuple/size.hpp>
 #include <boost/preprocessor/tuple/elem.hpp>
 
+#ifdef _WIN32
+#   include <windows.h>
+#endif
+
 /***************************************************************************/
 
 namespace construct_config {
@@ -31,10 +35,66 @@ template<bool ok>
 struct get_concrete_value {
     template<typename T>
     static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
-        return default_value != nullptr
+        std::string res = default_value != nullptr
            ? ini.get<T>(key, default_value)
            : ini.get<T>(key)
         ;
+
+        auto getenv = [](const char *s) -> std::string {
+            if ( 0 == std::strcmp(s, "CWD") ) {
+                char buf[1024];
+                return ::getcwd(buf, sizeof(buf));
+            }
+
+            if ( 0 == std::strcmp(s, "TEMP") ) {
+            #ifdef _WIN32
+                char buf[MAX_PATH+1+1];
+                ::GetTempPath(sizeof(buf), buf);
+                return buf;
+            #elif defined(__linux__)
+                if (const char *temp = ::getenv("TMPDIR")) {
+                    return temp;
+                } else if (const char *temp = ::getenv("TEMP")) {
+                    return temp;
+                } else if (const char *temp = ::getenv("TMP")) {
+                    return temp;
+                }
+                return "/tmp";
+            #else
+            #   error UNKNOWN HOST
+            #endif
+            }
+
+            if ( 0 == std::strcmp(s, "PID") ) {
+                pid_t pid = ::getpid();
+                return std::to_string(pid);
+            }
+
+            const char *env = ::getenv(s);
+            if ( !env ) {
+                std::string msg = "config-ctor: no env \""+std::string(s)+"\"";
+                throw std::runtime_error(msg);
+            }
+
+            return env;
+        };
+        static const std::string vars[] = {
+            {"HOME"},{"USER"},{"CWD"},{"TEMP"},{"PID"},{"PATH"}
+        };
+
+        auto replace = [](std::string &str, const std::string &ostr, const std::string &nstr) {
+            std::string::size_type pos = 0u;
+            while ( (pos = str.find(ostr, pos)) != std::string::npos ) {
+                str.replace(pos, ostr.length(), nstr);
+                pos += nstr.length();
+            }
+        };
+
+        for (const auto &it: vars) {
+            replace(res, "${"+it+"}", getenv(it.c_str()));
+        }
+
+        return res;
     }
 };
 
