@@ -40,3 +40,16 @@ CONSTRUCT_INI_CONFIG(
 	(double, b, 44.55)
 )
 ```
+
+Placeholders
+===========
+You can use placeholders in your config files.
+For example, this(`${HOME}/procs/${PID}/stat.log`) line in config file will be readed as `/home/nixman/procs/18151/stat.log`
+
+The following placeholders are supported:
+ - ${USER}
+ - ${HOME}
+ - ${CWD}
+ - ${TEMP}
+ - ${PID}
+ - ${PATH}
