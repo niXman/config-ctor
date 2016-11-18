@@ -36,10 +36,6 @@
 #ifndef __config_ctor__config_ctor_hpp
 #define __config_ctor__config_ctor_hpp
 
-#include <cstdint>
-#include <string>
-#include <iosfwd>
-
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -54,6 +50,11 @@
 #include <boost/preprocessor/seq/for_each_i.hpp>
 #include <boost/preprocessor/tuple/size.hpp>
 #include <boost/preprocessor/tuple/elem.hpp>
+
+#include <cstdint>
+#include <string>
+#include <iosfwd>
+#include <map>
 
 #ifdef _WIN32
 #   include <windows.h>
@@ -74,46 +75,43 @@ struct get_concrete_value {
            : ini.get<T>(key)
         ;
 
-        auto getenv = [](const char *s) -> std::string {
-            if ( 0 == std::strcmp(s, "CWD") ) {
-                char buf[1024];
-                return ::getcwd(buf, sizeof(buf));
-            }
-
-            if ( 0 == std::strcmp(s, "TEMP") ) {
-            #ifdef _WIN32
-                char buf[MAX_PATH+1+1];
-                ::GetTempPath(sizeof(buf), buf);
-                return buf;
-            #elif defined(__linux__)
-                if (const char *temp = ::getenv("TMPDIR")) {
-                    return temp;
-                } else if (const char *temp = ::getenv("TEMP")) {
-                    return temp;
-                } else if (const char *temp = ::getenv("TMP")) {
-                    return temp;
-                }
-                return "/tmp";
-            #else
-            #   error UNKNOWN HOST
-            #endif
-            }
-
-            if ( 0 == std::strcmp(s, "PID") ) {
-                pid_t pid = ::getpid();
-                return std::to_string(pid);
-            }
-
-            const char *env = ::getenv(s);
-            if ( !env ) {
-                std::string msg = "config-ctor: no env \""+std::string(s)+"\"";
-                throw std::runtime_error(msg);
-            }
-
-            return env;
+        static auto get_home = [](){ return ::getenv("HOME"); };
+        static auto get_user = [](){ return ::getenv("USER"); };
+        static auto get_cwd  = [](){
+            char buf[1024];
+            return ::getcwd(buf, sizeof(buf));
         };
-        static const std::string vars[] = {
-            {"HOME"},{"USER"},{"CWD"},{"TEMP"},{"PID"},{"PATH"}
+        static auto get_temp = [](){
+        #ifdef _WIN32
+            char buf[MAX_PATH+1+1];
+            ::GetTempPath(sizeof(buf), buf);
+            return buf;
+        #elif defined(__linux__)
+            if (const char *temp = ::getenv("TMPDIR")) {
+                return temp;
+            } else if (const char *temp = ::getenv("TEMP")) {
+                return temp;
+            } else if (const char *temp = ::getenv("TMP")) {
+                return temp;
+            }
+            return "/tmp";
+        #else
+        #   error UNKNOWN HOST
+        #endif
+        };
+        static auto get_pid  = [](){
+            ::pid_t pid = ::getpid();
+            return std::to_string(pid);
+        };
+        static auto get_path = [](){ return ::getenv("PATH"); };
+
+        static const std::map<std::string, std::function<std::string()>> map = {
+             {"{HOME}", std::move(get_home)}
+            ,{"{USER}", std::move(get_user)}
+            ,{"{CWD}" , std::move(get_cwd )}
+            ,{"{TEMP}", std::move(get_temp)}
+            ,{"{PID}" , std::move(get_pid )}
+            ,{"{PATH}", std::move(get_path)}
         };
 
         auto replace = [](std::string &str, const std::string &ostr, const std::string &nstr) {
@@ -124,8 +122,8 @@ struct get_concrete_value {
             }
         };
 
-        for (const auto &it: vars) {
-            replace(res, "${"+it+"}", getenv(it.c_str()));
+        for (const auto &it: map) {
+            replace(res, it.first, it.second());
         }
 
         return res;
