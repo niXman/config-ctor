@@ -1,5 +1,5 @@
 
-// Copyright (c) 2014-2016 niXman (i dot nixman dog gmail dot com). All
+// Copyright (c) 2014-2017 niXman (i dot nixman dog gmail dot com). All
 // rights reserved.
 //
 // This file is part of CONFIG-CTOR(https://github.com/niXman/config-ctor) project.
