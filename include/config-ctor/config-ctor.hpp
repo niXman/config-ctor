@@ -58,6 +58,9 @@
 
 #ifdef _WIN32
 #   include <windows.h>
+#else
+#   include <unistd.h>
+#   include <stdlib.h>
 #endif
 
 /***************************************************************************/
@@ -75,13 +78,13 @@ struct get_concrete_value {
            : ini.get<T>(key)
         ;
 
-        static auto get_home = [](){ return ::getenv("HOME"); };
-        static auto get_user = [](){ return ::getenv("USER"); };
-        static auto get_cwd  = [](){
+        static auto get_home = []() -> std::string { return ::getenv("HOME"); };
+        static auto get_user = []() -> std::string { return ::getenv("USER"); };
+        static auto get_cwd  = []() -> std::string {
             char buf[1024];
             return ::getcwd(buf, sizeof(buf));
         };
-        static auto get_temp = [](){
+        static auto get_temp = []() -> std::string {
         #ifdef _WIN32
             char buf[MAX_PATH+1+1];
             ::GetTempPath(sizeof(buf), buf);
@@ -99,11 +102,24 @@ struct get_concrete_value {
         #   error UNKNOWN HOST
         #endif
         };
-        static auto get_pid  = [](){
+        static auto get_pid  = []() -> std::string {
             ::pid_t pid = ::getpid();
             return std::to_string(pid);
         };
-        static auto get_path = [](){ return ::getenv("PATH"); };
+        static auto get_path = []() -> std::string { return ::getenv("PATH"); };
+        static auto get_proc_name = []() -> std::string {
+            char buf[1024] = "\0";
+        #ifdef _WIN32
+            ::GetModuleFileName(nullptr, buf, sizeof(buf)-1);
+            const char *p = std::strrchr(buf, '\\');
+        #elif defined(__linux__)
+            ::readlink("/proc/self/exe", buf, sizeof(buf)-1);
+            const char *p = std::strrchr(buf, '/');
+        #else
+        #   error UNKNOWN HOST
+        #endif
+            return p ? p+1 : buf;
+        };
 
         static const std::map<std::string, std::function<std::string()>> map = {
              {"{HOME}", std::move(get_home)}
@@ -112,6 +128,7 @@ struct get_concrete_value {
             ,{"{TEMP}", std::move(get_temp)}
             ,{"{PID}" , std::move(get_pid )}
             ,{"{PATH}", std::move(get_path)}
+            ,{"{PROC}", std::move(get_proc_name)}
         };
 
         auto replace = [](std::string &str, const std::string &ostr, const std::string &nstr) {

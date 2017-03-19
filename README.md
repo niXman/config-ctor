@@ -53,3 +53,4 @@ The following placeholders are supported:
  - `{TEMP}`
  - `{PID}`
  - `{PATH}`
+ - `{PROC}`

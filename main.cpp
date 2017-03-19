@@ -50,6 +50,21 @@ std::string get_temp() {
 std::string get_cwd() { return ::getcwd(nullptr, 1024); }
 std::string get_pid() { return std::to_string(::getpid()); }
 
+std::string get_proc_name() {
+    char buf[1024] = "\0";
+#ifdef _WIN32
+    ::GetModuleFileName(nullptr, buf, sizeof(buf)-1);
+    const char *p = std::strrchr(buf, '\\');
+#elif defined(__linux__)
+    ::readlink("/proc/self/exe", buf, sizeof(buf)-1);
+    const char *p = std::strrchr(buf, '/');
+#else
+#   error UNKNOWN HOST
+#endif
+
+    return p ? p+1 : buf;
+}
+
 /***************************************************************************/
 
 int main() {
@@ -191,54 +206,62 @@ int main() {
     }
     //////////////////////////////////////////////// env test
     {
-        const std::string user = ::getenv("USER"); MY_ASSERT(user.size());
-        const std::string home = ::getenv("HOME"); MY_ASSERT(home.size());
-        const std::string path = ::getenv("PATH"); MY_ASSERT(path.size());
-        const std::string cwd  = ::get_cwd()     ; MY_ASSERT(cwd.size());
-        const std::string temp = ::get_temp()    ; MY_ASSERT(temp.size());
-        const std::string pid  = ::get_pid()     ; MY_ASSERT(pid.size());
+        const std::string user = getenv("USER") ; MY_ASSERT(user.size());
+        const std::string home = getenv("HOME") ; MY_ASSERT(home.size());
+        const std::string path = getenv("PATH") ; MY_ASSERT(path.size());
+        const std::string cwd  = get_cwd()      ; MY_ASSERT(cwd.size());
+        const std::string temp = get_temp()     ; MY_ASSERT(temp.size());
+        const std::string pid  = get_pid()      ; MY_ASSERT(pid.size());
+        const std::string proc = get_proc_name(); MY_ASSERT(proc.size());
 
         // USER
         MY_ENV_TEST("{USER}", user);
-        MY_ENV_TEST("/{USER}", std::string("/") + user);
-        MY_ENV_TEST("{USER}/", user + std::string("/"));
-        MY_ENV_TEST("/{USER}/", std::string("/") + user + std::string("/"));
-        MY_ENV_TEST("/1/{USER}/2", std::string("/1/") + user + std::string("/2"));
+        MY_ENV_TEST("/{USER}", "/"+user);
+        MY_ENV_TEST("{USER}/", user+"/");
+        MY_ENV_TEST("/{USER}/", "/"+user+"/");
+        MY_ENV_TEST("/1/{USER}/2", "/1/"+user+"/2");
 
         // HOME
         MY_ENV_TEST("{HOME}", home);
-        MY_ENV_TEST("/{HOME}", std::string("/") + home);
-        MY_ENV_TEST("{HOME}/", home + std::string("/"));
-        MY_ENV_TEST("/{HOME}/", std::string("/") + home + std::string("/"));
-        MY_ENV_TEST("/1/{HOME}/2", std::string("/1/") + home + std::string("/2"));
+        MY_ENV_TEST("/{HOME}", "/"+home);
+        MY_ENV_TEST("{HOME}/", home+"/");
+        MY_ENV_TEST("/{HOME}/", "/"+home+"/");
+        MY_ENV_TEST("/1/{HOME}/2", "/1/"+home+"/2");
 
         // TEMP
         MY_ENV_TEST("{TEMP}", temp);
-        MY_ENV_TEST("/{TEMP}", std::string("/") + temp);
-        MY_ENV_TEST("{TEMP}/", temp + std::string("/"));
-        MY_ENV_TEST("/{TEMP}/", std::string("/") + temp + std::string("/"));
-        MY_ENV_TEST("/1/{TEMP}/2", std::string("/1/") + temp + std::string("/2"));
+        MY_ENV_TEST("/{TEMP}", "/"+temp);
+        MY_ENV_TEST("{TEMP}/", temp+"/");
+        MY_ENV_TEST("/{TEMP}/", "/"+temp+"/");
+        MY_ENV_TEST("/1/{TEMP}/2", "/1/"+temp+"/2");
 
         // CWD
         MY_ENV_TEST("{CWD}", cwd);
-        MY_ENV_TEST("/{CWD}", std::string("/") + cwd);
-        MY_ENV_TEST("{CWD}/", cwd + std::string("/"));
-        MY_ENV_TEST("/{CWD}/", std::string("/") + cwd + std::string("/"));
-        MY_ENV_TEST("/1/{CWD}/2", std::string("/1/") + cwd + std::string("/2"));
+        MY_ENV_TEST("/{CWD}", "/"+cwd);
+        MY_ENV_TEST("{CWD}/", cwd+"/");
+        MY_ENV_TEST("/{CWD}/", "/"+cwd+"/");
+        MY_ENV_TEST("/1/{CWD}/2", "/1/"+cwd+"/2");
 
         // PID
         MY_ENV_TEST("{PID}", pid);
-        MY_ENV_TEST("/{PID}", std::string("/") + pid);
-        MY_ENV_TEST("{PID}/", pid + std::string("/"));
-        MY_ENV_TEST("/{PID}/", std::string("/") + pid + std::string("/"));
-        MY_ENV_TEST("/1/{PID}/2", std::string("/1/") + pid + std::string("/2"));
+        MY_ENV_TEST("/{PID}", "/"+pid);
+        MY_ENV_TEST("{PID}/", pid+"/");
+        MY_ENV_TEST("/{PID}/", "/"+pid+"/");
+        MY_ENV_TEST("/1/{PID}/2", "/1/"+pid+"/2");
 
         // PATH
         MY_ENV_TEST("{PATH}", path);
-        MY_ENV_TEST("/{PATH}", std::string("/") + path);
-        MY_ENV_TEST("{PATH}/", path + std::string("/"));
-        MY_ENV_TEST("/{PATH}/", std::string("/") + path + std::string("/"));
-        MY_ENV_TEST("/1/{PATH}/2", std::string("/1/") + path + std::string("/2"));
+        MY_ENV_TEST("/{PATH}", "/"+path);
+        MY_ENV_TEST("{PATH}/", path+"/");
+        MY_ENV_TEST("/{PATH}/", "/"+path+"/");
+        MY_ENV_TEST("/1/{PATH}/2", "/1/"+path+"/2");
+
+        // PROCNAME
+        MY_ENV_TEST("{PROC}", proc);
+        MY_ENV_TEST("/{PROC}", "/"+proc);
+        MY_ENV_TEST("{PROC}/", proc+"/");
+        MY_ENV_TEST("/{PROC}/", "/"+proc+"/");
+        MY_ENV_TEST("/1/{PROC}/2", "/1/"+proc+"/2");
     }
 
     return EXIT_SUCCESS;
