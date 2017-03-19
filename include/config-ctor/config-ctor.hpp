@@ -131,7 +131,7 @@ struct get_concrete_value {
             ,{"{PROC}", std::move(get_proc_name)}
         };
 
-        auto replace = [](std::string &str, const std::string &ostr, const std::string &nstr) {
+        static auto replace = [](std::string &str, const std::string &ostr, const std::string &nstr) {
             std::string::size_type pos = 0u;
             while ( (pos = str.find(ostr, pos)) != std::string::npos ) {
                 str.replace(pos, ostr.length(), nstr);
