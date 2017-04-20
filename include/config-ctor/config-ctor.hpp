@@ -78,8 +78,24 @@ struct get_concrete_value {
            : ini.get<T>(key)
         ;
 
-        static auto get_home = []() -> std::string { return ::getenv("HOME"); };
-        static auto get_user = []() -> std::string { return ::getenv("USER"); };
+        static auto get_home = []() -> std::string {
+        #ifdef _WIN32
+            return ::getenv("HOMEPATH");
+        #elif defined(__linux__)
+            return ::getenv("HOME");
+        #else
+        #   error UNKNOWN HOST
+        #endif
+        };
+        static auto get_user = []() -> std::string {
+        #ifdef _WIN32
+            return ::getenv("USERNAME");
+        #elif defined(__linux__)
+            return ::getenv("USER");
+        #else
+        #   error UNKNOWN HOST
+        #endif
+        };
         static auto get_cwd  = []() -> std::string {
             char buf[1024];
             return ::getcwd(buf, sizeof(buf));
