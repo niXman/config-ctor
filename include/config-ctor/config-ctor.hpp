@@ -129,7 +129,7 @@ struct get_concrete_value {
             ::GetModuleFileName(nullptr, buf, sizeof(buf)-1);
             const char *p = std::strrchr(buf, '\\');
         #elif defined(__linux__)
-            ::readlink("/proc/self/exe", buf, sizeof(buf)-1);
+            if ( ::readlink("/proc/self/exe", buf, sizeof(buf)-1) == -1 ) return "";
             const char *p = std::strrchr(buf, '/');
         #else
         #   error UNKNOWN HOST
