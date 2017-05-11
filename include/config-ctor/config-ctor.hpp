@@ -170,20 +170,21 @@ struct get_concrete_value<true> {
     static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
         // handle bool types
         if (std::is_same<T, bool>::value) {
-            return default_value != nullptr
+            return (default_value != nullptr)
                ? ini.get<bool>(key, (std::strcmp(default_value, "true") == 0))
                : ini.get<bool>(key)
             ;
         }
 
         // handle other arithmetic types
-        std::string val = default_value != nullptr
+        std::string val = (default_value != nullptr)
             ? ini.get<std::string>(key, default_value)
             : ini.get<std::string>(key)
         ;
+
         if (val.empty()) return T{};
 
-        if ((std::is_signed<T>::value || std::is_unsigned<T>::value) && !std::is_floating_point<T>::value) {
+        if (std::is_integral<T>::value) {
             std::size_t mult = 1u;
             switch (val.back()) {
                 case 't': case 'T': mult *= 1024u;
