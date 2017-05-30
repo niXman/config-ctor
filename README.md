@@ -47,10 +47,10 @@ You can use placeholders in your config files.
 For example, this(`stat_log={HOME}/procs/{PID}/stat.log`) line in config file will be readed as `stat_log=/home/nixman/procs/18151/stat.log`
 
 The following placeholders are supported:
- - `{USER}`
- - `{HOME}`
- - `{CWD}`
- - `{TEMP}`
- - `{PID}`
- - `{PATH}`
- - `{PROC}`
+ - `{USER}` // user name
+ - `{HOME}` // user home oath
+ - `{CWD}`  // current path
+ - `{TEMP}` // user temp path
+ - `{PID}`  // process ID
+ - `{PATH}` // PATH env
+ - `{PROC}` // executable path
