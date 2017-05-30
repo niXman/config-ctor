@@ -48,9 +48,9 @@ For example, this(`stat_log={HOME}/procs/{PID}/stat.log`) line in config file wi
 
 The following placeholders are supported:
  - `{USER} // user name`
- - `{HOME}` // user home oath
- - `{CWD}`  // current path
- - `{TEMP}` // user temp path
- - `{PID}`  // process ID
- - `{PATH}` // PATH env
- - `{PROC}` // executable path
+ - `{HOME} // user home oath`
+ - `{CWD}  // current path`
+ - `{TEMP} // user temp path`
+ - `{PID}  // process ID`
+ - `{PATH} // PATH env`
+ - `{PROC} // executable path`
