@@ -81,7 +81,7 @@ struct get_concrete_value {
         static auto get_home = []() -> std::string {
         #ifdef _WIN32
             return ::getenv("HOMEPATH");
-        #elif defined(__linux__)
+        #elif defined(__linux__) || defined(__APPLE__)
             return ::getenv("HOME");
         #else
         #   error UNKNOWN HOST
@@ -90,7 +90,7 @@ struct get_concrete_value {
         static auto get_user = []() -> std::string {
         #ifdef _WIN32
             return ::getenv("USERNAME");
-        #elif defined(__linux__)
+        #elif defined(__linux__) || defined(__APPLE__)
             return ::getenv("USER");
         #else
         #   error UNKNOWN HOST
@@ -105,7 +105,7 @@ struct get_concrete_value {
             char buf[MAX_PATH+1+1];
             ::GetTempPath(sizeof(buf), buf);
             return buf;
-        #elif defined(__linux__)
+        #elif defined(__linux__) || defined(__APPLE__)
             if (const char *temp = ::getenv("TMPDIR")) {
                 return temp;
             } else if (const char *temp = ::getenv("TEMP")) {
@@ -128,7 +128,7 @@ struct get_concrete_value {
         #ifdef _WIN32
             ::GetModuleFileName(nullptr, buf, sizeof(buf)-1);
             const char *p = std::strrchr(buf, '\\');
-        #elif defined(__linux__)
+        #elif defined(__linux__) || defined(__APPLE__)
             if ( ::readlink("/proc/self/exe", buf, sizeof(buf)-1) == -1 ) return "";
             const char *p = std::strrchr(buf, '/');
         #else
