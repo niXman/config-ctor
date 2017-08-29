@@ -127,7 +127,7 @@ struct get_concrete_value {
         #ifdef _MSC_VER
             int pid=0;
         #else
-            ::pid_t=0;
+            ::pid_t pid=0;
         #endif
             pid = ::getpid();
             return std::to_string(pid);
