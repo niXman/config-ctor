@@ -63,6 +63,11 @@
 #   include <stdlib.h>
 #endif
 
+#ifdef _MSC_VER
+#   include <direct.h>
+#   include <process.h>
+#endif // _MSC_VER
+
 /***************************************************************************/
 
 namespace construct_config {
@@ -103,7 +108,7 @@ struct get_concrete_value {
         static auto get_temp = []() -> std::string {
         #ifdef _WIN32
             char buf[MAX_PATH+1+1];
-            ::GetTempPath(sizeof(buf), buf);
+            ::GetTempPathA(sizeof(buf), buf);
             return buf;
         #elif defined(__linux__) || defined(__APPLE__)
             if (const char *temp = ::getenv("TMPDIR")) {
@@ -119,14 +124,19 @@ struct get_concrete_value {
         #endif
         };
         static auto get_pid  = []() -> std::string {
-            ::pid_t pid = ::getpid();
+        #ifdef _MSC_VER
+            int pid=0;
+        #else
+            ::pid_t=0;
+        #endif
+            pid = ::getpid();
             return std::to_string(pid);
         };
         static auto get_path = []() -> std::string { return ::getenv("PATH"); };
         static auto get_proc_name = []() -> std::string {
             char buf[1024] = "\0";
         #ifdef _WIN32
-            ::GetModuleFileName(nullptr, buf, sizeof(buf)-1);
+            ::GetModuleFileNameA(nullptr, buf, sizeof(buf)-1);
             const char *p = std::strrchr(buf, '\\');
         #elif defined(__linux__) || defined(__APPLE__)
             if ( ::readlink("/proc/self/exe", buf, sizeof(buf)-1) == -1 ) return "";
