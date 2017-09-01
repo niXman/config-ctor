@@ -230,21 +230,21 @@ int main() {
     //////////////////////////////////////////////// env test
     {
         const std::string user = get_user(); MY_ASSERT(user.size());
-        std::cout << "user=" << user << std::endl;
+//        std::cout << "user=" << user << std::endl;
         const std::string home = get_home(); MY_ASSERT(home.size());
-        std::cout << "home=" << home << std::endl;
+//        std::cout << "home=" << home << std::endl;
         const std::string path = getenv("PATH") ; MY_ASSERT(path.size());
-        std::cout << "path=" << path << std::endl;
+//        std::cout << "path=" << path << std::endl;
         const std::string cwd  = get_cwd()      ; MY_ASSERT(cwd.size());
-        std::cout << "cwd=" << cwd << std::endl;
+//        std::cout << "cwd=" << cwd << std::endl;
         const std::string temp = get_temp()     ; MY_ASSERT(temp.size());
-        std::cout << "temp=" << temp << std::endl;
+//        std::cout << "temp=" << temp << std::endl;
         const std::string pid  = get_pid()      ; MY_ASSERT(pid.size());
-        std::cout << "pid=" << pid << std::endl;
+//        std::cout << "pid=" << pid << std::endl;
         const std::string procp = get_proc_path(); MY_ASSERT(procp.size());
-        std::cout << "procp=" << procp << std::endl;
+//        std::cout << "procp=" << procp << std::endl;
         const std::string proc = get_proc_name(); MY_ASSERT(proc.size());
-        std::cout << "proc=" << proc << std::endl;
+//        std::cout << "proc=" << proc << std::endl;
 
         // USER
         MY_ENV_TEST("{USER}", user);
