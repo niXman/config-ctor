@@ -57,22 +57,25 @@
 #include <map>
 
 #ifdef _WIN32
-#   include <windows.h>
-#endif // _WIN32
-
-#ifdef _MSC_VER
 #   include <direct.h>
-#   include <process.h>
 #else
 #   include <unistd.h>
-#endif // _MSC_VER
+#endif // _WIN32
 
 #include <stdlib.h>
 
 /***************************************************************************/
 
-namespace construct_config {
+namespace config_ctor {
+
+namespace detail {
+std::string get_procpath();
+std::string get_procname();
+} // ns detail
+
 namespace {
+
+/***************************************************************************/
 
 // for other types (strings)
 template<bool ok>
@@ -86,7 +89,7 @@ struct get_concrete_value {
 
         static auto get_home = []() -> std::string {
         #ifdef _WIN32
-            return ::getenv("HOMEPATH");
+            return ::getenv("USERPROFILE");
         #elif defined(__linux__) || defined(__APPLE__)
             return ::getenv("HOME");
         #else
@@ -107,11 +110,6 @@ struct get_concrete_value {
             return ::getcwd(buf, sizeof(buf));
         };
         static auto get_temp = []() -> std::string {
-        #ifdef _WIN32
-            char buf[MAX_PATH+1+1];
-            ::GetTempPathA(sizeof(buf), buf);
-            return buf;
-        #elif defined(__linux__) || defined(__APPLE__)
             if (const char *temp = ::getenv("TMPDIR")) {
                 return temp;
             } else if (const char *temp = ::getenv("TEMP")) {
@@ -120,33 +118,14 @@ struct get_concrete_value {
                 return temp;
             }
             return "/tmp";
-        #else
-        #   error UNKNOWN HOST
-        #endif
         };
         static auto get_pid  = []() -> std::string {
-        #ifdef _MSC_VER
-            int pid=0;
-        #else
-            ::pid_t pid=0;
-        #endif
-            pid = ::getpid();
+            int pid = ::getpid();
             return std::to_string(pid);
         };
         static auto get_path = []() -> std::string { return ::getenv("PATH"); };
-        static auto get_proc_name = []() -> std::string {
-            char buf[1024] = "\0";
-        #ifdef _WIN32
-            ::GetModuleFileNameA(nullptr, buf, sizeof(buf)-1);
-            const char *p = std::strrchr(buf, '\\');
-        #elif defined(__linux__) || defined(__APPLE__)
-            if ( ::readlink("/proc/self/exe", buf, sizeof(buf)-1) == -1 ) return "";
-            const char *p = std::strrchr(buf, '/');
-        #else
-        #   error UNKNOWN HOST
-        #endif
-            return p ? p+1 : buf;
-        };
+        static auto get_proc_name = []() -> std::string { return detail::get_procname(); };
+        static auto get_proc_path = []() -> std::string { return detail::get_procpath(); };
 
         static const std::map<std::string, std::function<std::string()>> map = {
              {"{HOME}", std::move(get_home)}
@@ -156,6 +135,7 @@ struct get_concrete_value {
             ,{"{PID}" , std::move(get_pid )}
             ,{"{PATH}", std::move(get_path)}
             ,{"{PROC}", std::move(get_proc_name)}
+            ,{"{PROCPATH}", std::move(get_proc_path)}
         };
 
         static auto replace = [](std::string &str, const std::string &ostr, const std::string &nstr) {
@@ -198,10 +178,10 @@ struct get_concrete_value<true> {
         if (std::is_integral<T>::value) {
             std::size_t mult = 1u;
             switch (val.back()) {
-                case 't': case 'T': mult *= 1024u;
-                case 'g': case 'G': mult *= 1024u;
-                case 'm': case 'M': mult *= 1024u;
-                case 'k': case 'K': mult *= 1024u;
+                case 't': case 'T': mult *= 1024u; // fallthrough
+                case 'g': case 'G': mult *= 1024u; // fallthrough
+                case 'm': case 'M': mult *= 1024u; // fallthrough
+                case 'k': case 'K': mult *= 1024u; // fallthrough
 
                 val.pop_back();
             }
@@ -237,7 +217,7 @@ struct print_value<true> {
     }
 };
 
-} // ns construct_config
+} // ns config_ctor
 
 /***************************************************************************/
 
@@ -262,7 +242,7 @@ struct print_value<true> {
 
 #define _CONSTRUCT_CONFIG__INIT_MEMBERS(unused, data, idx, elem) \
     BOOST_PP_COMMA_IF(idx) \
-        ::construct_config::get_value<BOOST_PP_TUPLE_ELEM(0, elem)>( \
+        ::config_ctor::get_value<BOOST_PP_TUPLE_ELEM(0, elem)>( \
              BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) \
             ,cfg \
             BOOST_PP_IF( \
@@ -274,7 +254,7 @@ struct print_value<true> {
 
 #define _CONSTRUCT_CONFIG__ENUM_MEMBERS(unused, data, idx, elem) \
     os << BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) "="; \
-    ::construct_config::print_value< \
+    ::config_ctor::print_value< \
         std::is_arithmetic<decltype(BOOST_PP_TUPLE_ELEM(1, elem))>::value \
     >::print(BOOST_PP_TUPLE_ELEM(1, elem), os); \
     os << std::endl;
@@ -373,5 +353,9 @@ struct print_value<true> {
     CONSTRUCT_CONFIG(info, name, seq)
 
 /***************************************************************************/
+
+#ifdef CONFIG_CTOR_HEADER_ONLY
+#   include <config-ctor/config-ctor.cpp>
+#endif // 
 
 #endif // __config_ctor__config_ctor_hpp

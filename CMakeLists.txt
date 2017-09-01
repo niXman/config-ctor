@@ -14,6 +14,7 @@ set(HEADERS
 
 set(SOURCES
 	./main.cpp
+	./include/config-ctor/config-ctor.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

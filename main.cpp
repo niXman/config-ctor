@@ -3,6 +3,10 @@
 
 #include <iostream>
 
+#ifdef _WIN32
+#   include <windows.h>
+#endif // _WIN32
+
 /***************************************************************************/
 
 #define MY_ASSERT(...) \
@@ -28,12 +32,23 @@
 
 /***************************************************************************/
 
-std::string get_temp() {
+std::string get_user() {
 #ifdef _WIN32
-    char buf[MAX_PATH+1+1];
-    ::GetTempPath(sizeof(buf), buf);
-    return buf;
-#elif defined(__linux__)
+    return ::getenv("USERNAME");
+#elif defined(__linux__) || defined(__APPLE__)
+    return ::getenv("USER");
+#endif // _WIN32
+}
+
+std::string get_home() {
+#ifdef _WIN32
+    return ::getenv("USERPROFILE");
+#elif defined(__linux__) || defined(__APPLE__)
+    return ::getenv("HOME");
+#endif // _WIN32
+}
+
+std::string get_temp() {
     if (const char *temp = ::getenv("TMPDIR")) {
         return temp;
     } else if (const char *temp = ::getenv("TEMP")) {
@@ -42,27 +57,35 @@ std::string get_temp() {
         return temp;
     }
     return "/tmp";
-#else
-#   error UNKNOWN HOST
-#endif
 }
 
 std::string get_cwd() { return ::getcwd(nullptr, 1024); }
 std::string get_pid() { return std::to_string(::getpid()); }
 
-std::string get_proc_name() {
+std::string get_proc_path() {
     char buf[1024] = "\0";
 #ifdef _WIN32
     ::GetModuleFileName(nullptr, buf, sizeof(buf)-1);
-    const char *p = std::strrchr(buf, '\\');
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     ::readlink("/proc/self/exe", buf, sizeof(buf)-1);
-    const char *p = std::strrchr(buf, '/');
 #else
 #   error UNKNOWN HOST
 #endif
 
-    return p ? p+1 : buf;
+    return buf;
+}
+
+std::string get_proc_name() {
+    const std::string procpath = get_proc_path();
+#ifdef _WIN32
+    const std::size_t p = procpath.rfind('\\');
+#elif defined(__linux__) || defined(__APPLE__)
+    const std::size_t p = procpath.rfind('/');
+#else
+#   error UNKNOWN HOST
+#endif
+
+    return p != std::string::npos ? procpath.substr(p+1) : procpath;
 }
 
 /***************************************************************************/
@@ -206,13 +229,22 @@ int main() {
     }
     //////////////////////////////////////////////// env test
     {
-        const std::string user = getenv("USER") ; MY_ASSERT(user.size());
-        const std::string home = getenv("HOME") ; MY_ASSERT(home.size());
+        const std::string user = get_user(); MY_ASSERT(user.size());
+        std::cout << "user=" << user << std::endl;
+        const std::string home = get_home(); MY_ASSERT(home.size());
+        std::cout << "home=" << home << std::endl;
         const std::string path = getenv("PATH") ; MY_ASSERT(path.size());
+        std::cout << "path=" << path << std::endl;
         const std::string cwd  = get_cwd()      ; MY_ASSERT(cwd.size());
+        std::cout << "cwd=" << cwd << std::endl;
         const std::string temp = get_temp()     ; MY_ASSERT(temp.size());
+        std::cout << "temp=" << temp << std::endl;
         const std::string pid  = get_pid()      ; MY_ASSERT(pid.size());
+        std::cout << "pid=" << pid << std::endl;
+        const std::string procp = get_proc_path(); MY_ASSERT(procp.size());
+        std::cout << "procp=" << procp << std::endl;
         const std::string proc = get_proc_name(); MY_ASSERT(proc.size());
+        std::cout << "proc=" << proc << std::endl;
 
         // USER
         MY_ENV_TEST("{USER}", user);
@@ -256,12 +288,19 @@ int main() {
         MY_ENV_TEST("/{PATH}/", "/"+path+"/");
         MY_ENV_TEST("/1/{PATH}/2", "/1/"+path+"/2");
 
-        // PROCNAME
+        // PROC
         MY_ENV_TEST("{PROC}", proc);
         MY_ENV_TEST("/{PROC}", "/"+proc);
         MY_ENV_TEST("{PROC}/", proc+"/");
         MY_ENV_TEST("/{PROC}/", "/"+proc+"/");
         MY_ENV_TEST("/1/{PROC}/2", "/1/"+proc+"/2");
+
+        // PROCPATH
+        MY_ENV_TEST("{PROCPATH}", procp);
+        MY_ENV_TEST("/{PROCPATH}", "/"+procp);
+        MY_ENV_TEST("{PROCPATH}/", procp+"/");
+        MY_ENV_TEST("/{PROCPATH}/", "/"+procp+"/");
+        MY_ENV_TEST("/1/{PROCPATH}/2", "/1/"+procp+"/2");
     }
 
     return EXIT_SUCCESS;
