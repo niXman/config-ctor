@@ -154,42 +154,56 @@ struct get_concrete_value {
     }
 };
 
-// specialization for arithmetic types
-template<>
-struct get_concrete_value<true> {
-    template<typename T>
-    static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
-        // handle bool types
-        if (std::is_same<T, bool>::value) {
-            return (default_value != nullptr)
-               ? ini.get<bool>(key, (std::strcmp(default_value, "true") == 0))
-               : ini.get<bool>(key)
-            ;
-        }
-
-        // handle other arithmetic types
+// handle other arithmetic types
+template<typename T>
+struct bool_case {
+    static T apply(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
         std::string val = (default_value != nullptr)
             ? ini.get<std::string>(key, default_value)
             : ini.get<std::string>(key)
         ;
 
-        if (val.empty()) return T{};
+        if ( val.empty() ) return T{};
 
-        if (std::is_integral<T>::value) {
-            std::size_t mult = 1u;
-            switch (val.back()) {
-                case 't': case 'T': mult *= 1024u; // fallthrough
-                case 'g': case 'G': mult *= 1024u; // fallthrough
-                case 'm': case 'M': mult *= 1024u; // fallthrough
-                case 'k': case 'K': mult *= 1024u; // fallthrough
+        if ( std::is_integral<T>::value ) {
+            std::int64_t mult = 1;
+            switch ( val.back() ) {
+                case 't': case 'T': mult *= 1024; // fallthrough
+                case 'g': case 'G': mult *= 1024; // fallthrough
+                case 'm': case 'M': mult *= 1024; // fallthrough
+                case 'k': case 'K': mult *= 1024; // fallthrough
 
-                val.pop_back();
+                    val.pop_back();
             }
 
-            return static_cast<T>((std::is_signed<T>::value ? std::stol(val) : std::stoul(val)) * mult);
+            if ( std::is_unsigned<T>::value ) {
+                return static_cast<T>(std::stoul(val) * mult);
+            } else {
+                return static_cast<T>(std::stol(val) * mult);
+            }
         }
 
         return static_cast<T>(std::stod(val));
+    }
+};
+
+// handle bool types
+template<>
+struct bool_case<bool> {
+    static bool apply(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
+        return (default_value != nullptr)
+            ? ini.get<bool>(key, (std::strcmp(default_value, "true") == 0))
+            : ini.get<bool>(key)
+        ;
+    }
+};
+
+// specialization for arithmetic types
+template<>
+struct get_concrete_value<true> {
+    template<typename T>
+    static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
+        return bool_case<T>::apply(key, ini, default_value);
     }
 };
 
