@@ -332,12 +332,14 @@ struct print_value<true> {
             boost::property_tree::write_##fmt(os, ptree); \
         } \
         \
-        void dump(std::ostream &os) const { \
+        std::ostream& dump(std::ostream &os) const { \
             BOOST_PP_SEQ_FOR_EACH_I( \
                  _CONSTRUCT_CONFIG__ENUM_MEMBERS \
                 ,~ \
                 ,seq \
             ) \
+            \
+            return os; \
         } \
     };
 
