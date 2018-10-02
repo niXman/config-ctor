@@ -1,5 +1,5 @@
 
-// Copyright (c) 2014-2017 niXman (i dot nixman dog gmail dot com). All
+// Copyright (c) 2014-2018 niXman (i dot nixman dog gmail dot com). All
 // rights reserved.
 //
 // This file is part of CONFIG-CTOR(https://github.com/niXman/config-ctor) project.
@@ -42,6 +42,8 @@
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 
+#include <boost/tti/has_member_function.hpp>
+
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/comparison/greater_equal.hpp>
 #include <boost/preprocessor/control/if.hpp>
@@ -67,8 +69,35 @@
 /***************************************************************************/
 
 namespace config_ctor {
-
 namespace detail {
+
+BOOST_TTI_HAS_MEMBER_FUNCTION(after_read)
+BOOST_TTI_HAS_MEMBER_FUNCTION(before_write)
+
+template<bool>
+struct call_after_read_proxy {
+    template<typename T>
+    static void call(T&) {}
+};
+
+template<>
+struct call_after_read_proxy<true> {
+    template<typename T>
+    static void call(T& o) { o.after_read(o); }
+};
+
+template<bool>
+struct call_before_write_proxy {
+    template<typename T>
+    static void call(const T&) {}
+};
+
+template<>
+struct call_before_write_proxy<true> {
+    template<typename T>
+    static void call(const T& o) { const_cast<T&>(o).before_write(const_cast<T&>(o)); }
+};
+
 std::string get_procpath();
 std::string get_procname();
 } // ns detail
@@ -280,8 +309,10 @@ struct print_value<true> {
 
 /***************************************************************************/
 
-#define _CONSTRUCT_CONFIG__GENERATE_STRUCT(fmt, name, seq) \
+#define _CONSTRUCT_CONFIG__GENERATE_STRUCT(fmt, name, seq, ...) \
     struct name { \
+        __VA_ARGS__ /* user code will expanded here */ \
+        \
         BOOST_PP_SEQ_FOR_EACH_I( \
              _CONSTRUCT_CONFIG__GENERATE_MEMBERS \
             ,~ \
@@ -292,28 +323,44 @@ struct print_value<true> {
             boost::property_tree::ptree cfg; \
             boost::property_tree::read_##fmt(is, cfg); \
             \
-            return { \
+            name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
                      _CONSTRUCT_CONFIG__INIT_MEMBERS \
                     ,~ \
                     ,seq \
                 ) \
             }; \
+            \
+            ::config_ctor::detail::call_after_read_proxy< \
+                ::config_ctor::detail::has_member_function_after_read<void (name::*)(name &)>::value \
+            >::call(res); \
+            \
+            return res; \
         } \
         static name read(const std::string &fname) { \
             boost::property_tree::ptree cfg; \
             boost::property_tree::read_##fmt(fname, cfg); \
             \
-            return { \
+            name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
                      _CONSTRUCT_CONFIG__INIT_MEMBERS \
                     ,~ \
                     ,seq \
                 ) \
             }; \
+            \
+            ::config_ctor::detail::call_after_read_proxy< \
+                ::config_ctor::detail::has_member_function_after_read<void (name::*)(name &)>::value \
+            >::call(res); \
+            \
+            return res; \
         } \
         \
         static void write(const std::string &fname, const name &cfg) { \
+            ::config_ctor::detail::call_before_write_proxy< \
+                ::config_ctor::detail::has_member_function_before_write<void (name::*)(name &)>::value \
+            >::call(cfg); \
+            \
             boost::property_tree::ptree ptree; \
             BOOST_PP_SEQ_FOR_EACH_I( \
                  _CONSTRUCT_CONFIG__ENUM_WRITE_MEMBERS \
@@ -323,6 +370,10 @@ struct print_value<true> {
             boost::property_tree::write_##fmt(fname, ptree); \
         } \
         static void write(std::ostream &os, const name &cfg) { \
+            ::config_ctor::detail::call_before_write_proxy< \
+                ::config_ctor::detail::has_member_function_before_write<void (name::*)(name &)>::value \
+            >::call(cfg); \
+            \
             boost::property_tree::ptree ptree; \
             BOOST_PP_SEQ_FOR_EACH_I( \
                  _CONSTRUCT_CONFIG__ENUM_WRITE_MEMBERS \
@@ -345,28 +396,30 @@ struct print_value<true> {
 
 /***************************************************************************/
 
-#define CONSTRUCT_CONFIG(\
+#define _CONSTRUCT_CONFIG(\
      fmt  /* config file format */ \
-, name /* config struct name */ \
-, seq  /* sequence of vars */ \
+    ,name /* config struct name */ \
+    ,seq  /* sequence of vars */ \
+    ,...  /* user code*/ \
 ) \
     _CONSTRUCT_CONFIG__GENERATE_STRUCT( \
          fmt \
         ,name \
         ,BOOST_PP_CAT(_CONSTRUCT_CONFIG__WRAP_SEQUENCE_X seq, 0) \
+        ,__VA_ARGS__ \
     )
 
-#define CONSTRUCT_INI_CONFIG(name, seq) \
-    CONSTRUCT_CONFIG(ini, name, seq)
+#define CONSTRUCT_INI_CONFIG(name, seq, ... /*user code*/) \
+    _CONSTRUCT_CONFIG(ini, name, seq, __VA_ARGS__)
 
-#define CONSTRUCT_JSON_CONFIG(name, seq) \
-    CONSTRUCT_CONFIG(json, name, seq)
+#define CONSTRUCT_JSON_CONFIG(name, seq, ... /*user code*/) \
+    _CONSTRUCT_CONFIG(json, name, seq, __VA_ARGS__)
 
-#define CONSTRUCT_XML_CONFIG(name, seq) \
-    CONSTRUCT_CONFIG(xml, name, seq)
+#define CONSTRUCT_XML_CONFIG(name, seq, ... /*user code*/) \
+    _CONSTRUCT_CONFIG(xml, name, seq, __VA_ARGS__)
 
-#define CONSTRUCT_INFO_CONFIG(name, seq) \
-    CONSTRUCT_CONFIG(info, name, seq)
+#define CONSTRUCT_INFO_CONFIG(name, seq, ... /*user code*/) \
+    _CONSTRUCT_CONFIG(info, name, seq, __VA_ARGS__)
 
 /***************************************************************************/
 

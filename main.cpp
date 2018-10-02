@@ -302,6 +302,42 @@ int main() {
         MY_ENV_TEST("/{PROCPATH}/", "/"+procp+"/");
         MY_ENV_TEST("/1/{PROCPATH}/2", "/1/"+procp+"/2");
     }
+    //////////////////////////////////////////////// user code test
+    {
+        CONSTRUCT_INI_CONFIG(
+            config
+            ,
+            (int, a)
+            (float, b)
+            (std::string, c)
+            (bool, c_not_empty)
+            ,
+            void after_read(config &cfg) {
+                std::cout << "after_read()" << std::endl;
+                cfg.c_not_empty = !cfg.c.empty();
+            }
+            void before_write(config &cfg) {
+                std::cout << "before_write()" << std::endl;
+                cfg.c_not_empty = !cfg.c.empty();
+            }
+        )
+
+        static const int a = 33;
+        static const float b = 44.55;
+        static const std::string c = "some string";
+
+        const config wcfg{a, b, c, false};
+
+        std::stringstream ss;
+        config::write(ss, wcfg);
+        DUMP_CONFIG(std::cout, ss, "test 'ini' config dump")
+
+        config rcfg = config::read(ss);
+        MY_ASSERT(rcfg.a == a);
+        MY_ASSERT(rcfg.b == b);
+        MY_ASSERT(rcfg.c == c);
+    }
+
 
     return EXIT_SUCCESS;
 }
