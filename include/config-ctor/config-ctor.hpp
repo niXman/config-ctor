@@ -57,6 +57,7 @@
 #include <string>
 #include <iosfwd>
 #include <map>
+#include <stdexcept>
 
 #ifdef _WIN32
 #   include <direct.h>
@@ -100,9 +101,6 @@ struct call_before_write_proxy<true> {
 
 std::string get_procpath();
 std::string get_procname();
-} // ns detail
-
-namespace {
 
 /***************************************************************************/
 
@@ -236,8 +234,6 @@ struct get_concrete_value<true> {
     }
 };
 
-} // anon ns
-
 template<typename T>
 static T get_value(const char *key, const boost::property_tree::ptree &cfg, const char *default_value) {
     using TT = typename std::remove_cv<T>::type;
@@ -260,6 +256,32 @@ struct print_value<true> {
     }
 };
 
+inline void check_config_keys_for_object_keys(
+     const char *configobj
+    ,const boost::property_tree::ptree &ptree
+    ,const char **arr)
+{
+    for ( const auto &it: ptree ) {
+        // because I won't include algorithms in this header %)
+        bool found = false;
+        for ( const char **ait = arr; *ait; ++ait ) {
+            if ( 0 == std::strcmp(it.first.c_str(), *ait) ) {
+                found = true;
+                break;
+            }
+        }
+        if ( !found ) {
+            std::string msg = "config-ctor: config file has \"";
+            msg += it.first;
+            msg += "\" key that doesn't exists in the \"";
+            msg += configobj;
+            msg += "\" object";
+            throw std::runtime_error(msg);
+        }
+    }
+}
+
+} // ns detail
 } // ns config_ctor
 
 /***************************************************************************/
@@ -285,7 +307,7 @@ struct print_value<true> {
 
 #define _CONSTRUCT_CONFIG__INIT_MEMBERS(unused, data, idx, elem) \
     BOOST_PP_COMMA_IF(idx) \
-        ::config_ctor::get_value<BOOST_PP_TUPLE_ELEM(0, elem)>( \
+        ::config_ctor::detail::get_value<BOOST_PP_TUPLE_ELEM(0, elem)>( \
              BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) \
             ,cfg \
             BOOST_PP_IF( \
@@ -297,7 +319,7 @@ struct print_value<true> {
 
 #define _CONSTRUCT_CONFIG__ENUM_MEMBERS(unused, data, idx, elem) \
     os << BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) "="; \
-    ::config_ctor::print_value< \
+    ::config_ctor::detail::print_value< \
         std::is_arithmetic<decltype(BOOST_PP_TUPLE_ELEM(1, elem))>::value \
     >::print(BOOST_PP_TUPLE_ELEM(1, elem), os); \
     os << std::endl;
@@ -306,6 +328,27 @@ struct print_value<true> {
 
 #define _CONSTRUCT_CONFIG__ENUM_WRITE_MEMBERS(unused, data, idx, elem) \
     ptree.put(BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)), cfg.BOOST_PP_TUPLE_ELEM(1, elem));
+
+#define _CONSTRUCT_CONFIG__GENERATE_MEMBERS_STR_NAMES(unused0, unused1, idx, elem) \
+    BOOST_PP_COMMA_IF(idx) \
+        BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem))
+
+#define _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(cfgname, ptree, seq) { \
+    static const char *keys[] = { \
+        BOOST_PP_SEQ_FOR_EACH_I( \
+             _CONSTRUCT_CONFIG__GENERATE_MEMBERS_STR_NAMES \
+            ,~ \
+            ,seq \
+        ) \
+        ,nullptr \
+    }; \
+    config_ctor::detail::check_config_keys_for_object_keys( \
+         cfgname \
+        ,ptree \
+        ,keys \
+    ); \
+}
+
 
 /***************************************************************************/
 
@@ -322,6 +365,8 @@ struct print_value<true> {
         static name read(std::istream &is) { \
             boost::property_tree::ptree cfg; \
             boost::property_tree::read_##fmt(is, cfg); \
+            \
+            _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, cfg, seq) \
             \
             name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
@@ -340,6 +385,8 @@ struct print_value<true> {
         static name read(const std::string &fname) { \
             boost::property_tree::ptree cfg; \
             boost::property_tree::read_##fmt(fname, cfg); \
+            \
+            _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, cfg, seq) \
             \
             name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
