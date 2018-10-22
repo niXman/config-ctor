@@ -53,6 +53,7 @@
 #include <boost/preprocessor/tuple/size.hpp>
 #include <boost/preprocessor/tuple/elem.hpp>
 
+#include <cstdlib>
 #include <cstdint>
 #include <string>
 #include <iosfwd>
@@ -64,8 +65,6 @@
 #else
 #   include <unistd.h>
 #endif // _WIN32
-
-#include <stdlib.h>
 
 /***************************************************************************/
 
