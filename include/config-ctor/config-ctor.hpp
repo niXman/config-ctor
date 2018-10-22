@@ -56,7 +56,7 @@
 #include <cstdint>
 #include <string>
 #include <iosfwd>
-#include <map>
+#include <array>
 #include <stdexcept>
 
 #ifdef _WIN32
@@ -153,18 +153,6 @@ struct get_concrete_value {
         static auto get_path = []() -> std::string { return ::getenv("PATH"); };
         static auto get_proc_name = []() -> std::string { return detail::get_procname(); };
         static auto get_proc_path = []() -> std::string { return detail::get_procpath(); };
-
-        static const std::map<std::string, std::function<std::string()>> map = {
-             {"{HOME}", std::move(get_home)}
-            ,{"{USER}", std::move(get_user)}
-            ,{"{CWD}" , std::move(get_cwd )}
-            ,{"{TEMP}", std::move(get_temp)}
-            ,{"{PID}" , std::move(get_pid )}
-            ,{"{PATH}", std::move(get_path)}
-            ,{"{PROC}", std::move(get_proc_name)}
-            ,{"{PROCPATH}", std::move(get_proc_path)}
-        };
-
         static auto replace = [](std::string &str, const std::string &ostr, const std::string &nstr) {
             std::string::size_type pos = 0u;
             while ( (pos = str.find(ostr, pos)) != std::string::npos ) {
@@ -173,6 +161,16 @@ struct get_concrete_value {
             }
         };
 
+        static const std::array<std::pair<const char *, std::function<std::string()>>, 8> map = {{
+             {"{HOME}", get_home}
+            ,{"{USER}", get_user}
+            ,{"{CWD}", get_cwd}
+            ,{"{TEMP}", get_temp}
+            ,{"{PID}", get_pid}
+            ,{"{PATH}", get_path}
+            ,{"{PROC}", get_proc_name}
+            ,{"{PROCPATH}", get_proc_path}
+        }};
         for (const auto &it: map) {
             replace(res, it.first, it.second());
         }
@@ -333,7 +331,7 @@ inline void check_config_keys_for_object_keys(
     BOOST_PP_COMMA_IF(idx) \
         BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem))
 
-#define _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(cfgname, ptree, seq) { \
+#define _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(cfgname, keys, ptree, seq) { \
     static const char *keys[] = { \
         BOOST_PP_SEQ_FOR_EACH_I( \
              _CONSTRUCT_CONFIG__GENERATE_MEMBERS_STR_NAMES \
@@ -352,6 +350,10 @@ inline void check_config_keys_for_object_keys(
 
 /***************************************************************************/
 
+#define _CONSTRUCT_CONFIG__PROCESS_USERS_PLACEHOLDERS(ptree, keys)
+
+/***************************************************************************/
+
 #define _CONSTRUCT_CONFIG__GENERATE_STRUCT(fmt, name, seq, ...) \
     struct name { \
         __VA_ARGS__ /* user code will expanded here */ \
@@ -366,7 +368,8 @@ inline void check_config_keys_for_object_keys(
             boost::property_tree::ptree cfg; \
             boost::property_tree::read_##fmt(is, cfg); \
             \
-            _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, cfg, seq) \
+            _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
+            _CONSTRUCT_CONFIG__PROCESS_USERS_PLACEHOLDERS(cfg, keys) \
             \
             name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
@@ -386,7 +389,8 @@ inline void check_config_keys_for_object_keys(
             boost::property_tree::ptree cfg; \
             boost::property_tree::read_##fmt(fname, cfg); \
             \
-            _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, cfg, seq) \
+            _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
+            _CONSTRUCT_CONFIG__PROCESS_USERS_PLACEHOLDERS(cfg, keys) \
             \
             name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
