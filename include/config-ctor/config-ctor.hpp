@@ -283,38 +283,38 @@ inline void check_config_keys_for_object_keys(
 
 /***************************************************************************/
 
-#define _CONSTRUCT_CONFIG__WRAP_SEQUENCE_X(...) \
-    ((__VA_ARGS__)) _CONSTRUCT_CONFIG__WRAP_SEQUENCE_Y
-#define _CONSTRUCT_CONFIG__WRAP_SEQUENCE_Y(...) \
-    ((__VA_ARGS__)) _CONSTRUCT_CONFIG__WRAP_SEQUENCE_X
+#define __CONFIG_CTOR__WRAP_SEQUENCE_X(...) \
+    ((__VA_ARGS__)) __CONFIG_CTOR__WRAP_SEQUENCE_Y
+#define __CONFIG_CTOR__WRAP_SEQUENCE_Y(...) \
+    ((__VA_ARGS__)) __CONFIG_CTOR__WRAP_SEQUENCE_X
 
-#define _CONSTRUCT_CONFIG__WRAP_SEQUENCE_X0
-#define _CONSTRUCT_CONFIG__WRAP_SEQUENCE_Y0
+#define __CONFIG_CTOR__WRAP_SEQUENCE_X0
+#define __CONFIG_CTOR__WRAP_SEQUENCE_Y0
 
 /***************************************************************************/
 
-#define _CONSTRUCT_CONFIG__GENERATE_MEMBERS(unused, data, idx, elem) \
+#define __CONFIG_CTOR__GENERATE_MEMBERS(unused, data, idx, elem) \
     BOOST_PP_TUPLE_ELEM(0, elem) /* type */ BOOST_PP_TUPLE_ELEM(1, elem) /* var name */ ;
 
-#define _CONSTRUCT_CONFIG__INIT_MEMBERS_WITH_DEFAULT(...) \
+#define __CONFIG_CTOR__INIT_MEMBERS_WITH_DEFAULT(...) \
     ,BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2, __VA_ARGS__))
 
-#define _CONSTRUCT_CONFIG__INIT_MEMBERS_WITHOUT_DEFAULT(...) \
+#define __CONFIG_CTOR__INIT_MEMBERS_WITHOUT_DEFAULT(...) \
     ,nullptr
 
-#define _CONSTRUCT_CONFIG__INIT_MEMBERS(unused, data, idx, elem) \
+#define __CONFIG_CTOR__INIT_MEMBERS(unused, data, idx, elem) \
     BOOST_PP_COMMA_IF(idx) \
         ::config_ctor::detail::get_value<BOOST_PP_TUPLE_ELEM(0, elem)>( \
              BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) \
             ,cfg \
             BOOST_PP_IF( \
                  BOOST_PP_GREATER_EQUAL(BOOST_PP_TUPLE_SIZE(elem), 3) \
-                ,_CONSTRUCT_CONFIG__INIT_MEMBERS_WITH_DEFAULT \
-                ,_CONSTRUCT_CONFIG__INIT_MEMBERS_WITHOUT_DEFAULT \
+                ,__CONFIG_CTOR__INIT_MEMBERS_WITH_DEFAULT \
+                ,__CONFIG_CTOR__INIT_MEMBERS_WITHOUT_DEFAULT \
             )(elem) \
         )
 
-#define _CONSTRUCT_CONFIG__ENUM_MEMBERS(unused, data, idx, elem) \
+#define __CONFIG_CTOR__ENUM_MEMBERS(unused, data, idx, elem) \
     os << BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) "="; \
     ::config_ctor::detail::print_value< \
         std::is_arithmetic<decltype(BOOST_PP_TUPLE_ELEM(1, elem))>::value \
@@ -323,17 +323,17 @@ inline void check_config_keys_for_object_keys(
 
 /***************************************************************************/
 
-#define _CONSTRUCT_CONFIG__ENUM_WRITE_MEMBERS(unused, data, idx, elem) \
+#define __CONFIG_CTOR__ENUM_WRITE_MEMBERS(unused, data, idx, elem) \
     ptree.put(BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)), cfg.BOOST_PP_TUPLE_ELEM(1, elem));
 
-#define _CONSTRUCT_CONFIG__GENERATE_MEMBERS_STR_NAMES(unused0, unused1, idx, elem) \
+#define __CONFIG_CTOR__GENERATE_MEMBERS_STR_NAMES(unused0, unused1, idx, elem) \
     BOOST_PP_COMMA_IF(idx) \
         BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem))
 
-#define _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(cfgname, keys, ptree, seq) { \
+#define __CONFIG_CTOR__GENERATE_KEY_CHECKING(cfgname, keys, ptree, seq) { \
     static const char *keys[] = { \
         BOOST_PP_SEQ_FOR_EACH_I( \
-             _CONSTRUCT_CONFIG__GENERATE_MEMBERS_STR_NAMES \
+             __CONFIG_CTOR__GENERATE_MEMBERS_STR_NAMES \
             ,~ \
             ,seq \
         ) \
@@ -348,12 +348,12 @@ inline void check_config_keys_for_object_keys(
 
 /***************************************************************************/
 
-#define _CONSTRUCT_CONFIG__GENERATE_STRUCT(fmt, name, seq, ...) \
+#define __CONFIG_CTOR__GENERATE_STRUCT(fmt, name, seq, ...) \
     struct name { \
         __VA_ARGS__ /* user code will expanded here */ \
         \
         BOOST_PP_SEQ_FOR_EACH_I( \
-             _CONSTRUCT_CONFIG__GENERATE_MEMBERS \
+             __CONFIG_CTOR__GENERATE_MEMBERS \
             ,~ \
             ,seq \
         ) \
@@ -362,11 +362,11 @@ inline void check_config_keys_for_object_keys(
             boost::property_tree::ptree cfg; \
             boost::property_tree::read_##fmt(is, cfg); \
             \
-            _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
+            __CONFIG_CTOR__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
             \
             name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
-                     _CONSTRUCT_CONFIG__INIT_MEMBERS \
+                     __CONFIG_CTOR__INIT_MEMBERS \
                     ,~ \
                     ,seq \
                 ) \
@@ -382,11 +382,11 @@ inline void check_config_keys_for_object_keys(
             boost::property_tree::ptree cfg; \
             boost::property_tree::read_##fmt(fname, cfg); \
             \
-            _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
+            __CONFIG_CTOR__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
             \
             name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
-                     _CONSTRUCT_CONFIG__INIT_MEMBERS \
+                     __CONFIG_CTOR__INIT_MEMBERS \
                     ,~ \
                     ,seq \
                 ) \
@@ -406,7 +406,7 @@ inline void check_config_keys_for_object_keys(
             \
             boost::property_tree::ptree ptree; \
             BOOST_PP_SEQ_FOR_EACH_I( \
-                 _CONSTRUCT_CONFIG__ENUM_WRITE_MEMBERS \
+                 __CONFIG_CTOR__ENUM_WRITE_MEMBERS \
                 ,~ \
                 ,seq \
             ) \
@@ -419,7 +419,7 @@ inline void check_config_keys_for_object_keys(
             \
             boost::property_tree::ptree ptree; \
             BOOST_PP_SEQ_FOR_EACH_I( \
-                 _CONSTRUCT_CONFIG__ENUM_WRITE_MEMBERS \
+                 __CONFIG_CTOR__ENUM_WRITE_MEMBERS \
                 ,~ \
                 ,seq \
             ) \
@@ -431,7 +431,7 @@ inline void check_config_keys_for_object_keys(
         } \
         std::ostream& dump(std::ostream &os) const { \
             BOOST_PP_SEQ_FOR_EACH_I( \
-                 _CONSTRUCT_CONFIG__ENUM_MEMBERS \
+                 __CONFIG_CTOR__ENUM_MEMBERS \
                 ,~ \
                 ,seq \
             ) \
@@ -442,30 +442,30 @@ inline void check_config_keys_for_object_keys(
 
 /***************************************************************************/
 
-#define _CONSTRUCT_CONFIG(\
+#define __CONSTRUCT_CONFIG(\
      fmt  /* config file format */ \
     ,name /* config struct name */ \
     ,seq  /* sequence of vars */ \
     ,...  /* user code*/ \
 ) \
-    _CONSTRUCT_CONFIG__GENERATE_STRUCT( \
+    __CONFIG_CTOR__GENERATE_STRUCT( \
          fmt \
         ,name \
-        ,BOOST_PP_CAT(_CONSTRUCT_CONFIG__WRAP_SEQUENCE_X seq, 0) \
+        ,BOOST_PP_CAT(__CONFIG_CTOR__WRAP_SEQUENCE_X seq, 0) \
         ,__VA_ARGS__ \
     )
 
 #define CONSTRUCT_INI_CONFIG(name, seq, ... /*user code*/) \
-    _CONSTRUCT_CONFIG(ini, name, seq, __VA_ARGS__)
+    __CONSTRUCT_CONFIG(ini, name, seq, __VA_ARGS__)
 
 #define CONSTRUCT_JSON_CONFIG(name, seq, ... /*user code*/) \
-    _CONSTRUCT_CONFIG(json, name, seq, __VA_ARGS__)
+    __CONSTRUCT_CONFIG(json, name, seq, __VA_ARGS__)
 
 #define CONSTRUCT_XML_CONFIG(name, seq, ... /*user code*/) \
-    _CONSTRUCT_CONFIG(xml, name, seq, __VA_ARGS__)
+    __CONSTRUCT_CONFIG(xml, name, seq, __VA_ARGS__)
 
 #define CONSTRUCT_INFO_CONFIG(name, seq, ... /*user code*/) \
-    _CONSTRUCT_CONFIG(info, name, seq, __VA_ARGS__)
+    __CONSTRUCT_CONFIG(info, name, seq, __VA_ARGS__)
 
 /***************************************************************************/
 
