@@ -346,11 +346,6 @@ inline void check_config_keys_for_object_keys(
     ); \
 }
 
-
-/***************************************************************************/
-
-#define _CONSTRUCT_CONFIG__PROCESS_USERS_PLACEHOLDERS(ptree, keys)
-
 /***************************************************************************/
 
 #define _CONSTRUCT_CONFIG__GENERATE_STRUCT(fmt, name, seq, ...) \
@@ -368,7 +363,6 @@ inline void check_config_keys_for_object_keys(
             boost::property_tree::read_##fmt(is, cfg); \
             \
             _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
-            _CONSTRUCT_CONFIG__PROCESS_USERS_PLACEHOLDERS(cfg, keys) \
             \
             name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
@@ -389,7 +383,6 @@ inline void check_config_keys_for_object_keys(
             boost::property_tree::read_##fmt(fname, cfg); \
             \
             _CONSTRUCT_CONFIG__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
-            _CONSTRUCT_CONFIG__PROCESS_USERS_PLACEHOLDERS(cfg, keys) \
             \
             name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
@@ -433,6 +426,9 @@ inline void check_config_keys_for_object_keys(
             boost::property_tree::write_##fmt(os, ptree); \
         } \
         \
+        std::ostream& operator<< (std::ostream &os) { \
+            return dump(os); \
+        } \
         std::ostream& dump(std::ostream &os) const { \
             BOOST_PP_SEQ_FOR_EACH_I( \
                  _CONSTRUCT_CONFIG__ENUM_MEMBERS \

@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 2.8)
 project(config-ctor)
 
@@ -8,13 +7,10 @@ include_directories(
 	./include
 )
 
-set(HEADERS
-	config-ctor/config-ctor.hpp
-)
-
 set(SOURCES
 	./main.cpp
-	./include/config-ctor/config-ctor.cpp
+    ./include/config-ctor/config-ctor.hpp
+    ./include/config-ctor/config-ctor.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
