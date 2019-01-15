@@ -1,5 +1,5 @@
 
-// Copyright (c) 2014-2018 niXman (i dot nixman dog gmail dot com). All
+// Copyright (c) 2014-2019 niXman (i dot nixman dog gmail dot com). All
 // rights reserved.
 //
 // This file is part of CONFIG-CTOR(https://github.com/niXman/config-ctor) project.
@@ -58,6 +58,7 @@
 #include <string>
 #include <iosfwd>
 #include <array>
+#include <functional>
 #include <stdexcept>
 
 #ifdef _WIN32
@@ -109,8 +110,8 @@ struct get_concrete_value {
     template<typename T>
     static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
         std::string res = default_value != nullptr
-           ? ini.get<T>(key, default_value)
-           : ini.get<T>(key)
+            ? ini.get<T>(key, default_value)
+            : ini.get<T>(key)
         ;
 
         static auto get_home = []() -> std::string {
@@ -160,7 +161,23 @@ struct get_concrete_value {
             }
         };
 
-        static const std::array<std::pair<const char *, std::function<std::string()>>, 8> map = {{
+        static auto trim = [](std::string &s) {
+            if ( s.empty() ) return;
+
+            static auto ltrim = [](std::string &s) {
+                s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) { return !std::isspace(ch); }));
+            };
+            static auto rtrim = [](std::string &s) {
+                s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) { return !std::isspace(ch); }).base(), s.end());
+            };
+
+            ltrim(s);
+            rtrim(s);
+        };
+
+
+        using pair_t = std::pair<const char *, std::function<std::string()>>;
+        static const std::array<pair_t, 8> map = {{
              {"{HOME}", get_home}
             ,{"{USER}", get_user}
             ,{"{CWD}", get_cwd}
@@ -170,8 +187,41 @@ struct get_concrete_value {
             ,{"{PROC}", get_proc_name}
             ,{"{PROCPATH}", get_proc_path}
         }};
-        for (const auto &it: map) {
+        for ( const auto &it: map ) {
             replace(res, it.first, it.second());
+        }
+
+        // process {GETENV(var)} && {GETENV(var, default)}
+        static const char getenv_pref[]   = "{GETENV(";
+        static const auto getenv_pref_len = sizeof(getenv_pref)-1;
+        static const char getenv_suff[]   = ")}";
+        static const auto getenv_suff_len = sizeof(getenv_suff)-1;
+
+        auto beg = res.find(getenv_pref, 0, getenv_pref_len);
+        if ( beg != std::string::npos ) {
+            auto end = res.find(getenv_suff, beg, getenv_suff_len);
+            auto body = res.substr(beg+getenv_pref_len, end-(beg+getenv_pref_len));
+            auto comma = body.find(',');
+            std::string env, def;
+            if ( comma != std::string::npos ) {
+                env = body.substr(0, comma);
+                def = body.substr(comma+1);
+            } else {
+                env = body;
+            }
+            trim(env);
+            trim(def);
+
+            const char *penv = ::getenv(env.c_str());
+            if ( penv ) {
+                res.replace(beg, end+getenv_suff_len-beg, penv);
+            } else {
+                if ( !def.empty() ) {
+                    res.replace(beg, end+getenv_suff_len-beg, def.c_str());
+                } else {
+                    res.replace(beg, end+getenv_suff_len-beg, "<NULL>");
+                }
+            }
         }
 
         return res;
@@ -197,7 +247,7 @@ struct bool_case {
                 case 'm': case 'M': mult *= 1024; // fallthrough
                 case 'k': case 'K': mult *= 1024; // fallthrough
 
-                    val.pop_back();
+                val.pop_back();
             }
 
             if ( std::is_unsigned<T>::value ) {
@@ -471,6 +521,6 @@ inline void check_config_keys_for_object_keys(
 
 #ifdef CONFIG_CTOR_HEADER_ONLY
 #   include <config-ctor/config-ctor.cpp>
-#endif // 
+#endif // CONFIG_CTOR_HEADER_ONLY
 
 #endif // __config_ctor__config_ctor_hpp

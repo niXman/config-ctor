@@ -43,14 +43,15 @@ CONSTRUCT_INI_CONFIG(
 
 Placeholders
 ===========
-You can use placeholders in your config files.
+Also you can use placeholders in your config files.
 For example, this(`stat_log={HOME}/procs/{PID}/stat.log`) line in config file will be readed as `stat_log=/home/nixman/procs/18151/stat.log`
 
 The following placeholders are supported:
- - `{USER} // user name`
- - `{HOME} // user home oath`
- - `{CWD}  // current path`
- - `{TEMP} // user temp path`
- - `{PID}  // process ID`
- - `{PATH} // PATH env`
- - `{PROC} // executable path`
+ - `{USER}            // user name`
+ - `{HOME}            // user home path`
+ - `{CWD}             // current path`
+ - `{TEMP}            // user temp path`
+ - `{PID}             // process ID`
+ - `{PATH}            // PATH env`
+ - `{PROC}            // executable path`
+ - `{GETENV(ENV_VAR)} // gets the system env var value. also you can use it with default value: {GETENV(ENV_VAR, defaul_value)}`
