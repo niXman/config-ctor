@@ -35,6 +35,8 @@
 
 #include <config-ctor/config-ctor.hpp>
 
+#include <boost/multiprecision/cpp_dec_float.hpp>
+
 #include <iostream>
 
 #ifdef _WIN32
@@ -127,21 +129,27 @@ std::string get_proc_name() {
 int main() {
     //////////////////////////////////////////////// ini
     {
+        using double_type = boost::multiprecision::number<
+            boost::multiprecision::cpp_dec_float<8>
+        >;
         CONSTRUCT_INI_CONFIG(
             config,
             (int, a)
             (float, b)
             (std::string, c)
+            (double_type, d)
         )
 
         static const int a = 33;
         static const float b = 44.55;
         static const std::string c = "some string";
+        static const double_type d = 66.77;
 
         config wcfg;
         wcfg.a = a;
         wcfg.b = b;
         wcfg.c = c;
+        wcfg.d = d;
 
         std::stringstream ss;
         config::write(ss, wcfg);
@@ -151,6 +159,7 @@ int main() {
         MY_ASSERT(rcfg.a == a);
         MY_ASSERT(rcfg.b == b);
         MY_ASSERT(rcfg.c == c);
+        MY_ASSERT(rcfg.d == d);
     }
     //////////////////////////////////////////////// json
     {

@@ -110,8 +110,8 @@ struct get_concrete_value {
     template<typename T>
     static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
         std::string res = default_value != nullptr
-            ? ini.get<T>(key, default_value)
-            : ini.get<T>(key)
+            ? ini.get<std::string>(key, default_value)
+            : ini.get<std::string>(key)
         ;
 
         static auto get_home = []() -> std::string {
@@ -224,7 +224,7 @@ struct get_concrete_value {
             }
         }
 
-        return res;
+        return T{res};
     }
 };
 
