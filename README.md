@@ -10,7 +10,7 @@ Currently the `ini`, `json`, `xml`, `info` formats are supported.
 
 Tutorial
 ===========
-Describe the info about options you need:
+1) Describe the info about options you need:
 ```cpp
 CONSTRUCT_INI_CONFIG(
 	myconfig, // the name of the generated type(struct)
@@ -18,11 +18,11 @@ CONSTRUCT_INI_CONFIG(
 	(double, b)
 )
 ```
-For read the options from the `.ini` file:
+2) For read the options from the `.ini` file:
 ```cpp
 myconfig cfg = myconfig::read("myconfig.ini");
 ```
-For write the options to the `.ini` file:
+3) For write the options to the `.ini` file:
 ```cpp
 myconfig cfg;
 cfg.a = 33;
