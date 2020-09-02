@@ -55,7 +55,7 @@
 #endif // CONFIG_CTOR_HEADER_ONLY
 
 namespace config_ctor {
-namespace detail {
+namespace details {
 
 __CONFIGCTOR_INLINE std::string get_procpath() {
     char buf[1024] = "\0";
@@ -82,5 +82,5 @@ __CONFIGCTOR_INLINE std::string get_procname() {
     return p != std::string::npos ? procpath.substr(p+1) : procpath;
 }
 
-} // ns detail
+} // ns details
 } // ns config_ctor

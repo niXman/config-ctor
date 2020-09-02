@@ -45,25 +45,19 @@
 
 /***************************************************************************/
 
-#define MY_ASSERT(...) \
-    if ( !(__VA_ARGS__) ) { \
-        std::cerr << "expression error(" __FILE__ ":" BOOST_PP_STRINGIZE(__LINE__) "): \"" #__VA_ARGS__ "\"" << std::endl; \
-        std::abort(); \
-    }
-
 #define DUMP_CONFIG(os, ss, descr) \
     os << "[" descr "]:" << std::endl; \
     os << ss.str() << std::endl;
 
 #define MY_ENV_TEST(env, exp) { \
-    CONSTRUCT_INI_CONFIG( \
+    CONSTRUCT_CONFIG( \
         config, \
         (std::string, path) \
     ) \
     std::stringstream ss; \
-    ss << "path=" << env << std::endl; \
+    ss << "{\"path\":\"" << env << "\"}" << std::endl; \
     config cfg = config::read(ss); \
-    MY_ASSERT(cfg.path == exp) ; \
+    assert(cfg.path == exp) ; \
 }
 
 /***************************************************************************/
@@ -126,13 +120,40 @@ std::string get_proc_name() {
 
 /***************************************************************************/
 
+using double_type = boost::multiprecision::number<
+    boost::multiprecision::cpp_dec_float<8>
+>;
+
+namespace config_ctor {
+namespace details {
+
+double_type get_value(
+     const double_type &
+    ,const char *key
+    ,const flatjson::fjson &cfg
+    ,const char *default_value)
+{
+    if ( !default_value ) {
+        const auto ss = cfg.at(key).to_string();
+        return double_type{ss.data()};
+    }
+
+    return !cfg.contains(key)
+        ? double_type{default_value}
+        : double_type{cfg.at(key).to_string().data()}
+    ;
+}
+
+void write_value(std::ostream &os, const double_type &v) {
+    os << v;
+}
+
+} // ns details
+} // ns config_ctor
+
 int main() {
-    //////////////////////////////////////////////// ini
     {
-        using double_type = boost::multiprecision::number<
-            boost::multiprecision::cpp_dec_float<8>
-        >;
-        CONSTRUCT_INI_CONFIG(
+        CONSTRUCT_CONFIG(
             config,
             (int, a)
             (float, b)
@@ -143,108 +164,29 @@ int main() {
         static const int a = 33;
         static const float b = 44.55;
         static const std::string c = "some string";
-        static const double_type d = 66.77;
+        static const double_type d{"66.77"};
 
-        config wcfg;
-        wcfg.a = a;
-        wcfg.b = b;
-        wcfg.c = c;
-        wcfg.d = d;
-
-        std::stringstream ss;
-        config::write(ss, wcfg);
-        DUMP_CONFIG(std::cout, ss, "test 'ini' config dump")
-
-        const config rcfg = config::read(ss);
-        MY_ASSERT(rcfg.a == a);
-        MY_ASSERT(rcfg.b == b);
-        MY_ASSERT(rcfg.c == c);
-        MY_ASSERT(rcfg.d == d);
-    }
-    //////////////////////////////////////////////// json
-    {
-        CONSTRUCT_JSON_CONFIG(
-            config,
-            (double, a)
-            (long, b)
-            (std::uint16_t, c)
-        )
-
-        static const double a = 33.44;
-        static const long b = 55;
-        static const std::uint16_t c = 66;
-
-        config wcfg;
-        wcfg.a = a;
-        wcfg.b = b;
-        wcfg.c = c;
+        const config wcfg{
+             a
+            ,b
+            ,c
+            ,d
+        };
 
         std::stringstream ss;
         config::write(ss, wcfg);
-        DUMP_CONFIG(std::cout, ss, "test 'json' config dump")
+        DUMP_CONFIG(std::cout, ss, "test config dump")
 
         const config rcfg = config::read(ss);
-        MY_ASSERT(rcfg.a == a);
-        MY_ASSERT(rcfg.b == b);
-        MY_ASSERT(rcfg.c == c);
+        assert(rcfg.a == a);
+        assert(rcfg.b == b);
+        assert(rcfg.c == c);
+        assert(rcfg.d == d);
     }
-    //////////////////////////////////////////////// xml
-    {
-        CONSTRUCT_XML_CONFIG(
-            config,
-            (double, a)
-            (long, b)
-            (std::uint16_t, c)
-        )
 
-        static const double a = 33.44;
-        static const long b = 55;
-        static const std::uint16_t c = 66;
-
-        config wcfg;
-        wcfg.a = a;
-        wcfg.b = b;
-        wcfg.c = c;
-
-        std::stringstream ss;
-        config::write(ss, wcfg);
-        DUMP_CONFIG(std::cout, ss, "test 'xml' config dump")
-
-        const config rcfg = config::read(ss);
-        MY_ASSERT(rcfg.a == a);
-        MY_ASSERT(rcfg.b == b);
-        MY_ASSERT(rcfg.c == c);
-    }
-    //////////////////////////////////////////////// info
-    {
-        CONSTRUCT_INFO_CONFIG(
-            config,
-            (double, a)
-            (long, b)
-            (std::uint16_t, c)
-        )
-
-        static const double a = 33.44;
-        static const long b = 55;
-        static const std::uint16_t c = 66;
-
-        config wcfg;
-        wcfg.a = a;
-        wcfg.b = b;
-        wcfg.c = c;
-
-        std::stringstream ss;
-        config::write(ss, wcfg);
-        DUMP_CONFIG(std::cout, ss, "test 'info' config dump")
-
-        const config rcfg = config::read(ss);
-        MY_ASSERT(rcfg.a == a);
-        MY_ASSERT(rcfg.b == b);
-        MY_ASSERT(rcfg.c == c);
-    }
     //////////////////////////////////////////////// default value test
     {
-        CONSTRUCT_INI_CONFIG(
+        CONSTRUCT_CONFIG(
             config,
             (int, a)
             (bool, b, false)
@@ -258,35 +200,37 @@ int main() {
         static const std::string d = "string";
 
         std::stringstream ss;
-        ss << "a=" << a << std::endl
-           << "d=" << d << std::endl
-           << "f=64k" << std::endl;
+        ss << "{" << std::endl
+           << "\"a\":" << a << std::endl
+           << ",\"d\":\"" << d << "\"" << std::endl
+           << ",\"f\":\"64k\"" << std::endl
+           << "}" << std::endl;
 
         const config rcfg = config::read(ss);
-        MY_ASSERT(rcfg.a == a);
-        MY_ASSERT(rcfg.b == false);
-        MY_ASSERT(rcfg.c == 22);
-        MY_ASSERT(rcfg.d == d);
-        MY_ASSERT(rcfg.e == "/path/to/some/file.ext");
-        MY_ASSERT(rcfg.f == 64*1024);
+        assert(rcfg.a == a);
+        assert(rcfg.b == false);
+        assert(rcfg.c == 22);
+        assert(rcfg.d == d);
+        assert(rcfg.e == "/path/to/some/file.ext");
+        assert(rcfg.f == 64*1024);
     }
     //////////////////////////////////////////////// env test
     {
-        const std::string user = get_user(); MY_ASSERT(user.size());
+        const std::string user = get_user(); assert(user.size());
 //        std::cout << "user=" << user << std::endl;
-        const std::string home = get_home(); MY_ASSERT(home.size());
+        const std::string home = get_home(); assert(home.size());
 //        std::cout << "home=" << home << std::endl;
-        const std::string path = getenv("PATH") ; MY_ASSERT(path.size());
+        const std::string path = getenv("PATH") ; assert(path.size());
 //        std::cout << "path=" << path << std::endl;
-        const std::string cwd  = get_cwd()      ; MY_ASSERT(cwd.size());
+        const std::string cwd  = get_cwd()      ; assert(cwd.size());
 //        std::cout << "cwd=" << cwd << std::endl;
-        const std::string temp = get_temp()     ; MY_ASSERT(temp.size());
+        const std::string temp = get_temp()     ; assert(temp.size());
 //        std::cout << "temp=" << temp << std::endl;
-        const std::string pid  = get_pid()      ; MY_ASSERT(pid.size());
+        const std::string pid  = get_pid()      ; assert(pid.size());
 //        std::cout << "pid=" << pid << std::endl;
-        const std::string procp = get_proc_path(); MY_ASSERT(procp.size());
+        const std::string procp = get_proc_path(); assert(procp.size());
 //        std::cout << "procp=" << procp << std::endl;
-        const std::string proc = get_proc_name(); MY_ASSERT(proc.size());
+        const std::string proc = get_proc_name(); assert(proc.size());
 //        std::cout << "proc=" << proc << std::endl;
 
         // USER
@@ -353,7 +297,7 @@ int main() {
     }
     //////////////////////////////////////////////// user code test
     {
-        CONSTRUCT_INI_CONFIG(
+        CONSTRUCT_CONFIG(
             config
             ,
             (int, a)
@@ -379,12 +323,12 @@ int main() {
 
         std::stringstream ss;
         config::write(ss, wcfg);
-        DUMP_CONFIG(std::cout, ss, "test 'ini' config dump")
+        DUMP_CONFIG(std::cout, ss, "test config dump")
 
         config rcfg = config::read(ss);
-        MY_ASSERT(rcfg.a == a);
-        MY_ASSERT(rcfg.b == b);
-        MY_ASSERT(rcfg.c == c);
+        assert(rcfg.a == a);
+        assert(rcfg.b == b);
+        assert(rcfg.c == c);
     }
 
     return EXIT_SUCCESS;

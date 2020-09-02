@@ -36,11 +36,7 @@
 #ifndef __config_ctor__config_ctor_hpp
 #define __config_ctor__config_ctor_hpp
 
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/ini_parser.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/info_parser.hpp>
-#include <boost/property_tree/xml_parser.hpp>
+#include <config-ctor/flatjson.hpp>
 
 #include <boost/tti/has_member_function.hpp>
 
@@ -53,13 +49,13 @@
 #include <boost/preprocessor/tuple/size.hpp>
 #include <boost/preprocessor/tuple/elem.hpp>
 
-#include <cstdlib>
-#include <cstdint>
 #include <string>
 #include <iosfwd>
-#include <array>
-#include <functional>
+#include <fstream>
 #include <stdexcept>
+
+#include <cstdlib>
+#include <cstdint>
 
 #ifdef _WIN32
 #   include <direct.h>
@@ -70,7 +66,7 @@
 /***************************************************************************/
 
 namespace config_ctor {
-namespace detail {
+namespace details {
 
 BOOST_TTI_HAS_MEMBER_FUNCTION(after_read)
 BOOST_TTI_HAS_MEMBER_FUNCTION(before_write)
@@ -104,222 +100,286 @@ std::string get_procname();
 
 /***************************************************************************/
 
-// for other types (strings)
-template<bool ok>
-struct get_concrete_value {
-    template<typename T>
-    static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
-        std::string res = default_value != nullptr
-            ? ini.get<std::string>(key, default_value)
-            : ini.get<std::string>(key)
-        ;
-
-        static auto get_home = []() -> std::string {
-        #ifdef _WIN32
-            return ::getenv("USERPROFILE");
-        #elif defined(__linux__) || defined(__APPLE__)
-            return ::getenv("HOME");
-        #else
-        #   error UNKNOWN HOST
-        #endif
-        };
-        static auto get_user = []() -> std::string {
-        #ifdef _WIN32
-            return ::getenv("USERNAME");
-        #elif defined(__linux__) || defined(__APPLE__)
-            return ::getenv("USER");
-        #else
-        #   error UNKNOWN HOST
-        #endif
-        };
-        static auto get_cwd  = []() -> std::string {
-            char buf[1024];
-            return ::getcwd(buf, sizeof(buf));
-        };
-        static auto get_temp = []() -> std::string {
-            if (const char *temp = ::getenv("TMPDIR")) {
-                return temp;
-            } else if (const char *temp = ::getenv("TEMP")) {
-                return temp;
-            } else if (const char *temp = ::getenv("TMP")) {
-                return temp;
-            }
-            return "/tmp";
-        };
-        static auto get_pid  = []() -> std::string {
-            int pid = ::getpid();
-            return std::to_string(pid);
-        };
-        static auto get_path = []() -> std::string { return ::getenv("PATH"); };
-        static auto get_proc_name = []() -> std::string { return detail::get_procname(); };
-        static auto get_proc_path = []() -> std::string { return detail::get_procpath(); };
-        static auto replace = [](std::string &str, const std::string &ostr, const std::string &nstr) {
-            std::string::size_type pos = 0u;
-            while ( (pos = str.find(ostr, pos)) != std::string::npos ) {
-                str.replace(pos, ostr.length(), nstr);
-                pos += nstr.length();
-            }
-        };
-
-        static auto trim = [](std::string &s) {
-            if ( s.empty() ) return;
-
-            static auto ltrim = [](std::string &s) {
-                s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) { return !std::isspace(ch); }));
-            };
-            static auto rtrim = [](std::string &s) {
-                s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) { return !std::isspace(ch); }).base(), s.end());
-            };
-
-            ltrim(s);
-            rtrim(s);
-        };
-
-
-        using pair_t = std::pair<const char *, std::function<std::string()>>;
-        static const std::array<pair_t, 8> map = {{
-             {"{HOME}", get_home}
-            ,{"{USER}", get_user}
-            ,{"{CWD}", get_cwd}
-            ,{"{TEMP}", get_temp}
-            ,{"{PID}", get_pid}
-            ,{"{PATH}", get_path}
-            ,{"{PROC}", get_proc_name}
-            ,{"{PROCPATH}", get_proc_path}
-        }};
-        for ( const auto &it: map ) {
-            replace(res, it.first, it.second());
-        }
-
-        // process {GETENV(var)} && {GETENV(var, default)}
-        static const char getenv_pref[]   = "{GETENV(";
-        static const auto getenv_pref_len = sizeof(getenv_pref)-1;
-        static const char getenv_suff[]   = ")}";
-        static const auto getenv_suff_len = sizeof(getenv_suff)-1;
-
-        auto beg = res.find(getenv_pref, 0, getenv_pref_len);
-        if ( beg != std::string::npos ) {
-            auto end = res.find(getenv_suff, beg, getenv_suff_len);
-            auto body = res.substr(beg+getenv_pref_len, end-(beg+getenv_pref_len));
-            auto comma = body.find(',');
-            std::string env, def;
-            if ( comma != std::string::npos ) {
-                env = body.substr(0, comma);
-                def = body.substr(comma+1);
-            } else {
-                env = body;
-            }
-            trim(env);
-            trim(def);
-
-            const char *penv = ::getenv(env.c_str());
-            if ( penv ) {
-                res.replace(beg, end+getenv_suff_len-beg, penv);
-            } else {
-                if ( !def.empty() ) {
-                    res.replace(beg, end+getenv_suff_len-beg, def.c_str());
-                } else {
-                    res.replace(beg, end+getenv_suff_len-beg, "<NULL>");
-                }
-            }
-        }
-
-        return T{res};
-    }
-};
-
-// handle other arithmetic types
-template<typename T>
-struct bool_case {
-    static T apply(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
-        std::string val = (default_value != nullptr)
-            ? ini.get<std::string>(key, default_value)
-            : ini.get<std::string>(key)
-        ;
-
-        if ( val.empty() ) return T{};
-
-        if ( std::is_integral<T>::value ) {
-            std::int64_t mult = 1;
-            switch ( val.back() ) {
-                case 't': case 'T': mult *= 1024; // fallthrough
-                case 'g': case 'G': mult *= 1024; // fallthrough
-                case 'm': case 'M': mult *= 1024; // fallthrough
-                case 'k': case 'K': mult *= 1024; // fallthrough
-
-                val.pop_back();
-            }
-
-            if ( std::is_unsigned<T>::value ) {
-                return static_cast<T>(std::stoul(val) * mult);
-            } else {
-                return static_cast<T>(std::stol(val) * mult);
-            }
-        }
-
-        return static_cast<T>(std::stod(val));
-    }
-};
-
-// handle bool types
+template<typename>
+struct is_bool: std::false_type {};
 template<>
-struct bool_case<bool> {
-    static bool apply(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
-        return (default_value != nullptr)
-            ? ini.get<bool>(key, (std::strcmp(default_value, "true") == 0))
-            : ini.get<bool>(key)
-        ;
-    }
-};
-
-// specialization for arithmetic types
-template<>
-struct get_concrete_value<true> {
-    template<typename T>
-    static T get(const char *key, const boost::property_tree::ptree &ini, const char *default_value) {
-        return bool_case<T>::apply(key, ini, default_value);
-    }
-};
+struct is_bool<bool>: std::true_type {};
 
 template<typename T>
-static T get_value(const char *key, const boost::property_tree::ptree &cfg, const char *default_value) {
-    using TT = typename std::remove_cv<T>::type;
-    return get_concrete_value<std::is_arithmetic<TT>::value>::template get<TT>(key, cfg, default_value);
+struct is_integral: std::integral_constant<bool, std::is_integral<T>::value && !is_bool<T>::value> {};
+
+template<typename T>
+struct is_floating: std::is_floating_point<T> {};
+
+template<typename T>
+struct is_string: std::is_same<T, std::string> {};
+
+/***************************************************************************/
+
+// bool
+template<typename T>
+T get_value(
+     const T &
+    ,const char *key
+    ,const flatjson::fjson &cfg
+    ,const char *default_value
+    ,typename std::enable_if<is_bool<T>::value>::type* = nullptr)
+{
+    if ( !default_value ) {
+        return cfg.at(key).to_bool();
+    }
+
+    return !cfg.contains(key) ? (std::strcmp(default_value, "true") == 0) : cfg.at(key).to_bool();
 }
 
-template<bool ok>
-struct print_value {
-    template<typename T>
-    static void print(const T &v, std::ostream &os) {
-        os << '\"' << v << '\"';
+// integrals
+template<typename T>
+T get_value(
+     const T &
+    ,const char *key
+    ,const flatjson::fjson &cfg
+    ,const char *default_value
+    ,typename std::enable_if<is_integral<T>::value>::type* = nullptr)
+{
+    std::string val;
+    if ( !default_value ) {
+        val = cfg.at(key).to_string();
+    } else {
+        val = !cfg.contains(key)
+            ? default_value
+            : cfg.at(key).to_string()
+        ;
     }
-};
 
-template<>
-struct print_value<true> {
-    template<typename T>
-    static void print(const T &v, std::ostream &os) {
-        os << std::boolalpha << v;
+    std::int64_t mult = 1;
+    switch ( val.back() ) {
+        case 't': case 'T': mult *= 1024; // fallthrough
+        case 'g': case 'G': mult *= 1024; // fallthrough
+        case 'm': case 'M': mult *= 1024; // fallthrough
+        case 'k': case 'K': mult *= 1024; // fallthrough
+
+        val.pop_back();
     }
-};
+
+    if ( std::is_unsigned<T>::value ) {
+        return static_cast<T>(std::stoul(val) * mult);
+    } else {
+        return static_cast<T>(std::stol(val) * mult);
+    }
+}
+
+// floating
+template<typename T>
+T get_value(
+     const T &
+    ,const char *key
+    ,const flatjson::fjson &cfg
+    ,const char *default_value
+    ,typename std::enable_if<is_floating<T>::value>::type* = nullptr)
+{
+    if ( !default_value ) {
+        return cfg.at(key).to<T>();
+    }
+
+    return !cfg.contains(key)
+        ? (flatjson::details::conv_to<T>(default_value, std::strlen(default_value)))
+        : cfg.at(key).to<T>()
+    ;
+}
+
+template<typename Iterator, typename Pred>
+Iterator find_if(Iterator beg, Iterator end, Pred pred) {
+    for ( ; beg != end ; ++beg ) {
+        if ( pred(*beg) ) {
+            return beg;
+        }
+    }
+
+    return end;
+}
+
+// string
+template<typename T>
+T get_value(
+     const T &
+    ,const char *key
+    ,const flatjson::fjson &cfg
+    ,const char *default_value
+    ,typename std::enable_if<is_string<T>::value>::type* = nullptr)
+{
+    std::string res;
+    if ( !default_value ) {
+        res = cfg.at(key).to_string();
+    } else {
+        res = !cfg.contains(key)
+            ? default_value
+            : cfg.at(key).to_string()
+        ;
+    }
+
+    static auto get_home = []() -> std::string {
+    #ifdef _WIN32
+        return ::getenv("USERPROFILE");
+    #elif defined(__linux__) || defined(__APPLE__)
+        return ::getenv("HOME");
+    #else
+    #   error UNKNOWN HOST
+    #endif
+    };
+    static auto get_user = []() -> std::string {
+    #ifdef _WIN32
+        return ::getenv("USERNAME");
+    #elif defined(__linux__) || defined(__APPLE__)
+        return ::getenv("USER");
+    #else
+    #   error UNKNOWN HOST
+    #endif
+    };
+    static auto get_cwd  = []() -> std::string {
+        char buf[1024];
+        return ::getcwd(buf, sizeof(buf));
+    };
+    static auto get_temp = []() -> std::string {
+        if (const char *temp = ::getenv("TMPDIR")) {
+            return temp;
+        } else if (const char *temp = ::getenv("TEMP")) {
+            return temp;
+        } else if (const char *temp = ::getenv("TMP")) {
+            return temp;
+        }
+        return "/tmp";
+    };
+    static auto get_pid  = []() -> std::string {
+        int pid = ::getpid();
+        return std::to_string(pid);
+    };
+    static auto get_path = []() -> std::string { return ::getenv("PATH"); };
+    static auto get_proc_name = []() -> std::string { return details::get_procname(); };
+    static auto get_proc_path = []() -> std::string { return details::get_procpath(); };
+    static auto replace = [](std::string &str, const std::string &ostr, const std::string &nstr) {
+        std::string::size_type pos = 0u;
+        while ( (pos = str.find(ostr, pos)) != std::string::npos ) {
+            str.replace(pos, ostr.length(), nstr);
+            pos += nstr.length();
+        }
+    };
+
+    static auto trim = [](std::string &s) {
+        if ( s.empty() ) return;
+
+        static auto ltrim = [](std::string &s) {
+            auto p = ::config_ctor::details::find_if(s.begin(), s.end(), [](int ch) { return !std::isspace(ch); });
+            s.erase(s.begin(), p);
+        };
+        static auto rtrim = [](std::string &s) {
+            auto p = ::config_ctor::details::find_if(s.rbegin(), s.rend(), [](int ch) { return !std::isspace(ch); });
+            s.erase(p.base(), s.end());
+        };
+
+        ltrim(s);
+        rtrim(s);
+    };
+
+    using pair_t = std::pair<const char *, std::string(*)()>;
+    static const pair_t map[] = {
+         {"{HOME}", get_home}
+        ,{"{USER}", get_user}
+        ,{"{CWD}", get_cwd}
+        ,{"{TEMP}", get_temp}
+        ,{"{PID}", get_pid}
+        ,{"{PATH}", get_path}
+        ,{"{PROC}", get_proc_name}
+        ,{"{PROCPATH}", get_proc_path}
+    };
+    for ( const auto &it: map ) {
+        replace(res, it.first, it.second());
+    }
+
+    // process {GETENV(var)} && {GETENV(var, default)}
+    static const char getenv_pref[]   = "{GETENV(";
+    static const auto getenv_pref_len = sizeof(getenv_pref)-1;
+    static const char getenv_suff[]   = ")}";
+    static const auto getenv_suff_len = sizeof(getenv_suff)-1;
+
+    auto beg = res.find(getenv_pref, 0, getenv_pref_len);
+    if ( beg != std::string::npos ) {
+        auto end = res.find(getenv_suff, beg, getenv_suff_len);
+        auto body = res.substr(beg+getenv_pref_len, end-(beg+getenv_pref_len));
+        auto comma = body.find(',');
+        std::string env, def;
+        if ( comma != std::string::npos ) {
+            env = body.substr(0, comma);
+            def = body.substr(comma+1);
+        } else {
+            env = body;
+        }
+        trim(env);
+        trim(def);
+
+        const char *penv = ::getenv(env.c_str());
+        if ( penv ) {
+            res.replace(beg, end+getenv_suff_len-beg, penv);
+        } else {
+            if ( !def.empty() ) {
+                res.replace(beg, end+getenv_suff_len-beg, def.c_str());
+            } else {
+                res.replace(beg, end+getenv_suff_len-beg, "<NULL>");
+            }
+        }
+    }
+
+    return res;
+}
+
+/***************************************************************************/
+
+template<typename T>
+void write_value(
+     std::ostream &os
+    ,const T &v
+    ,typename std::enable_if<is_bool<T>::value>::type* = nullptr)
+{
+    os << std::boolalpha << v;
+}
+
+template<typename T>
+void write_value(
+     std::ostream &os
+    ,const T &v
+    ,typename std::enable_if<is_integral<T>::value || is_floating<T>::value>::type* = nullptr)
+{
+    os << v;
+}
+
+template<typename T>
+void write_value(
+    std::ostream &os
+    ,const T &v
+    ,typename std::enable_if<is_string<T>::value>::type* = nullptr)
+{
+    os << '\"' << v.c_str() << '\"';
+}
+
+/***************************************************************************/
 
 inline void check_config_keys_for_object_keys(
      const char *configobj
-    ,const boost::property_tree::ptree &ptree
+    ,const flatjson::fjson &json
     ,const char **arr)
 {
-    for ( const auto &it: ptree ) {
+    auto keys = json.get_keys();
+    for ( const auto &it: keys ) {
         // because I won't include algorithms in this header %)
         bool found = false;
         for ( const char **ait = arr; *ait; ++ait ) {
-            if ( 0 == std::strcmp(it.first.c_str(), *ait) ) {
+            if ( 0 == std::strncmp(it.data(), *ait, it.size()) ) {
                 found = true;
                 break;
             }
         }
         if ( !found ) {
             std::string msg = "config-ctor: config file has \"";
-            msg += it.first;
+            msg.append(it.data(), it.size());
             msg += "\" key that doesn't exists in the \"";
             msg += configobj;
             msg += "\" object";
@@ -328,7 +388,7 @@ inline void check_config_keys_for_object_keys(
     }
 }
 
-} // ns detail
+} // ns details
 } // ns config_ctor
 
 /***************************************************************************/
@@ -354,8 +414,9 @@ inline void check_config_keys_for_object_keys(
 
 #define __CONFIG_CTOR__INIT_MEMBERS(unused, data, idx, elem) \
     BOOST_PP_COMMA_IF(idx) \
-        ::config_ctor::detail::get_value<BOOST_PP_TUPLE_ELEM(0, elem)>( \
-             BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) \
+        ::config_ctor::details::get_value( \
+             BOOST_PP_TUPLE_ELEM(0, elem){} \
+            ,BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) \
             ,cfg \
             BOOST_PP_IF( \
                  BOOST_PP_GREATER_EQUAL(BOOST_PP_TUPLE_SIZE(elem), 3) \
@@ -365,16 +426,18 @@ inline void check_config_keys_for_object_keys(
         )
 
 #define __CONFIG_CTOR__ENUM_MEMBERS(unused, data, idx, elem) \
-    os << BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) "="; \
-    ::config_ctor::detail::print_value< \
-        std::is_arithmetic<decltype(BOOST_PP_TUPLE_ELEM(1, elem))>::value \
-    >::print(BOOST_PP_TUPLE_ELEM(1, elem), os); \
-    os << std::endl;
+    BOOST_PP_IF(idx, os << "   ,";, os << "    ";) \
+    os << "\"" BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) "\":"; \
+    ::config_ctor::details::write_value(os, BOOST_PP_TUPLE_ELEM(1, elem)); \
+    os << '\n';
 
 /***************************************************************************/
 
 #define __CONFIG_CTOR__ENUM_WRITE_MEMBERS(unused, data, idx, elem) \
-    ptree.put(BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)), cfg.BOOST_PP_TUPLE_ELEM(1, elem));
+    BOOST_PP_IF(idx, os << "   ,";, os << "    ";) \
+    os << "\"" BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) "\":"; \
+    ::config_ctor::details::write_value(os, cfg.BOOST_PP_TUPLE_ELEM(1, elem)); \
+    os << '\n';
 
 #define __CONFIG_CTOR__GENERATE_MEMBERS_STR_NAMES(unused0, unused1, idx, elem) \
     BOOST_PP_COMMA_IF(idx) \
@@ -389,7 +452,7 @@ inline void check_config_keys_for_object_keys(
         ) \
         ,nullptr \
     }; \
-    config_ctor::detail::check_config_keys_for_object_keys( \
+    config_ctor::details::check_config_keys_for_object_keys( \
          cfgname \
         ,ptree \
         ,keys \
@@ -398,7 +461,7 @@ inline void check_config_keys_for_object_keys(
 
 /***************************************************************************/
 
-#define __CONFIG_CTOR__GENERATE_STRUCT(fmt, name, seq, ...) \
+#define __CONFIG_CTOR__GENERATE_STRUCT(name, seq, ...) \
     struct name { \
         __VA_ARGS__ /* user code will expanded here */ \
         \
@@ -409,82 +472,69 @@ inline void check_config_keys_for_object_keys(
         ) \
         \
         static name read(std::istream &is) { \
-            boost::property_tree::ptree cfg; \
-            boost::property_tree::read_##fmt(is, cfg); \
+            std::string str( \
+                 (std::istreambuf_iterator<char>(is)) \
+                ,std::istreambuf_iterator<char>()) \
+            ; \
+            const flatjson::fjson cfg{str.c_str(), str.c_str()+str.length()}; \
+            if ( !cfg.is_valid() ) { \
+                std::string msg{"config file parse error: "}; \
+                msg += cfg.error_string(); \
+                throw std::runtime_error{msg}; \
+            } \
             \
             __CONFIG_CTOR__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
             \
             name res{ \
                 BOOST_PP_SEQ_FOR_EACH_I( \
                      __CONFIG_CTOR__INIT_MEMBERS \
-                    ,~ \
+                    ,name \
                     ,seq \
                 ) \
             }; \
             \
-            ::config_ctor::detail::call_after_read_proxy< \
-                ::config_ctor::detail::has_member_function_after_read<void (name::*)(name &)>::value \
+            ::config_ctor::details::call_after_read_proxy< \
+                ::config_ctor::details::has_member_function_after_read<void (name::*)(name &)>::value \
             >::call(res); \
             \
             return res; \
         } \
         static name read(const std::string &fname) { \
-            boost::property_tree::ptree cfg; \
-            boost::property_tree::read_##fmt(fname, cfg); \
-            \
-            __CONFIG_CTOR__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
-            \
-            name res{ \
-                BOOST_PP_SEQ_FOR_EACH_I( \
-                     __CONFIG_CTOR__INIT_MEMBERS \
-                    ,~ \
-                    ,seq \
-                ) \
-            }; \
-            \
-            ::config_ctor::detail::call_after_read_proxy< \
-                ::config_ctor::detail::has_member_function_after_read<void (name::*)(name &)>::value \
-            >::call(res); \
-            \
-            return res; \
+            std::ifstream is{fname}; \
+            assert(is.good()); \
+            return read(is); \
         } \
         \
-        static void write(const std::string &fname, const name &cfg) { \
-            ::config_ctor::detail::call_before_write_proxy< \
-                ::config_ctor::detail::has_member_function_before_write<void (name::*)(name &)>::value \
-            >::call(cfg); \
-            \
-            boost::property_tree::ptree ptree; \
-            BOOST_PP_SEQ_FOR_EACH_I( \
-                 __CONFIG_CTOR__ENUM_WRITE_MEMBERS \
-                ,~ \
-                ,seq \
-            ) \
-            boost::property_tree::write_##fmt(fname, ptree); \
-        } \
         static void write(std::ostream &os, const name &cfg) { \
-            ::config_ctor::detail::call_before_write_proxy< \
-                ::config_ctor::detail::has_member_function_before_write<void (name::*)(name &)>::value \
+            ::config_ctor::details::call_before_write_proxy< \
+                ::config_ctor::details::has_member_function_before_write<void (name::*)(name &)>::value \
             >::call(cfg); \
             \
-            boost::property_tree::ptree ptree; \
+            os << "{\n"; \
             BOOST_PP_SEQ_FOR_EACH_I( \
                  __CONFIG_CTOR__ENUM_WRITE_MEMBERS \
                 ,~ \
                 ,seq \
             ) \
-            boost::property_tree::write_##fmt(os, ptree); \
+            os << "}\n"; \
+        } \
+        static void write(const std::string &fname, const name &cfg) { \
+            std::ofstream os{fname}; \
+            assert(os.good()); \
+            return write(os, cfg); \
         } \
         \
         std::ostream& operator<< (std::ostream &os) { \
             return dump(os); \
         } \
         std::ostream& dump(std::ostream &os) const { \
+            os << "{\n"; \
             BOOST_PP_SEQ_FOR_EACH_I( \
                  __CONFIG_CTOR__ENUM_MEMBERS \
                 ,~ \
                 ,seq \
             ) \
+            os << "}\n"; \
             \
             return os; \
         } \
@@ -492,30 +542,16 @@ inline void check_config_keys_for_object_keys(
 
 /***************************************************************************/
 
-#define __CONSTRUCT_CONFIG(\
-     fmt  /* config file format */ \
-    ,name /* config struct name */ \
+#define CONSTRUCT_CONFIG(\
+     name /* config struct name */ \
     ,seq  /* sequence of vars */ \
     ,...  /* user code*/ \
 ) \
     __CONFIG_CTOR__GENERATE_STRUCT( \
-         fmt \
-        ,name \
+         name \
         ,BOOST_PP_CAT(__CONFIG_CTOR__WRAP_SEQUENCE_X seq, 0) \
         ,__VA_ARGS__ \
     )
-
-#define CONSTRUCT_INI_CONFIG(name, seq, ... /*user code*/) \
-    __CONSTRUCT_CONFIG(ini, name, seq, __VA_ARGS__)
-
-#define CONSTRUCT_JSON_CONFIG(name, seq, ... /*user code*/) \
-    __CONSTRUCT_CONFIG(json, name, seq, __VA_ARGS__)
-
-#define CONSTRUCT_XML_CONFIG(name, seq, ... /*user code*/) \
-    __CONSTRUCT_CONFIG(xml, name, seq, __VA_ARGS__)
-
-#define CONSTRUCT_INFO_CONFIG(name, seq, ... /*user code*/) \
-    __CONSTRUCT_CONFIG(info, name, seq, __VA_ARGS__)
 
 /***************************************************************************/
 

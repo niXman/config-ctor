@@ -3,38 +3,35 @@
 config-ctor
 ===========
 
-Configuration reader/writer constructor based on [boost.property_tree](http://www.boost.org/doc/libs/1_59_0/libs/property_tree/index.html).
-
-Currently the `ini`, `json`, `xml`, `info` formats are supported.
-
+C++ preprocessor type constuctor for processing structured configuration files.
 
 Tutorial
 ===========
-1) Describe the info about options you need:
+Describe the info about options you need:
 ```cpp
-CONSTRUCT_INI_CONFIG(
+CONSTRUCT_CONFIG(
 	myconfig, // the name of the generated type(struct)
 	(int, a) // the sequence of the variables
 	(double, b)
 )
 ```
-2) For read the options from the `.ini` file:
+For read the options from file:
 ```cpp
-myconfig cfg = myconfig::read("myconfig.ini");
+myconfig cfg = myconfig::read("myconfig.cfg");
 ```
-3) For write the options to the `.ini` file:
+For write the options to file:
 ```cpp
 myconfig cfg;
 cfg.a = 33;
 cfg.b = 44.55;
-myconfig::write("myconfig.ini", cfg);
+myconfig::write("myconfig.cfg", cfg);
 ```
 
 Default values
 ===========
-You can specify the default values for options. To do this, specify the third parameter for this variable:
+You can specify the default values for options. To do this, specify the third parameter for that variable:
 ```cpp
-CONSTRUCT_INI_CONFIG(
+CONSTRUCT_CONFIG(
 	myconfig, // the name of the generated type(struct)
 	(int, a, 33) // the sequence of the variables
 	(double, b, 44.55)
