@@ -16,9 +16,9 @@ notifications:
    on_failure: always
 
 before_install:
-  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y; fi
-  - sudo apt-get update -q; fi
-  - sudo apt-get upgrade -y; fi
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update -q
+  - sudo apt-get upgrade -y
   - wget http://sourceforge.net/projects/boost/files/boost/1.68.0/boost_1_68_0.tar.bz2
   - tar jxf boost_1_68_0.tar.bz2
   - sudo cp -r boost_1_68_0/boost /usr/local/include
