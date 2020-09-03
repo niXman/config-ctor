@@ -3,7 +3,7 @@ language: cpp
 os:
   - linux
 
-dist: trusty
+dist: bionic
 sudo: required
 
 compiler:
@@ -16,9 +16,6 @@ notifications:
    on_failure: always
 
 before_install:
-  - sudo /etc/init.d/postgresql stop
-  - sudo apt-get remove postgresql-9.* -y
-  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
   - sudo apt-get update -q
   - sudo apt-get upgrade -y
   - wget http://sourceforge.net/projects/boost/files/boost/1.68.0/boost_1_68_0.tar.bz2
