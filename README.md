@@ -27,6 +27,23 @@ cfg.b = 44.55;
 myconfig::write("myconfig.cfg", cfg);
 ```
 
+Nested config-ctor types
+===========
+As members now you can use nested config-ctor types:
+```cpp
+CONSTRUCT_CONFIG(
+    option,
+    (int, i)
+    (std::string, s)
+)
+CONSTRUCT_CONFIG(
+    myconfig, // the name of the generated type(struct)
+    (int, a) // the sequence of the variables
+    (double, b)
+    (option, o) // <<<<<<<<<<<<<<<<<<<<<<
+)
+```
+
 Default values
 ===========
 You can specify the default values for options. To do this, specify the third parameter for that variable:
