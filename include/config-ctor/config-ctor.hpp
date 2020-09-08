@@ -421,16 +421,25 @@ struct is_stl_container_like {
     static const bool value = test<test_type>(nullptr);
 };
 
+template<
+     typename T
+    ,typename = typename std::enable_if<is_config_ctor_type<T>::value>::type
+>
+std::ostream& operator<< (std::ostream &os, const T &v) {
+    return v.dump(os);
+}
+
 template<typename Iterator, std::size_t N>
 void out_for_each(std::ostream &os, Iterator beg, Iterator end, const char(&delim)[N]) {
     for ( ; beg != end; ++beg ) {
-        if ( is_string<typename std::iterator_traits<Iterator>::value_type>::value ) {
+        using value_type = typename std::iterator_traits<Iterator>::value_type;
+        if ( is_string<value_type>::value ) {
             os << '\"';
         }
 
         os << *beg;
 
-        if ( is_string<typename std::iterator_traits<Iterator>::value_type>::value ) {
+        if ( is_string<value_type>::value ) {
             os << '\"';
         }
 
@@ -782,10 +791,6 @@ inline void check_config_keys_for_object_keys(
         } \
     };
 
-template<typename T, typename = typename std::enable_if<::config_ctor::details::is_config_ctor_type<T>::value>::type>
-std::ostream& operator<< (std::ostream &os, const T &v) {
-    return v.dump(os);
-}
 /***************************************************************************/
 
 #define CONSTRUCT_CONFIG(\
