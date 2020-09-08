@@ -101,25 +101,54 @@ std::string get_procname();
 /***************************************************************************/
 
 template<typename>
-struct is_bool: std::false_type {};
+struct is_bool: std::false_type
+{};
+
 template<>
-struct is_bool<bool>: std::true_type {};
+struct is_bool<bool>: std::true_type
+{};
 
 template<typename T>
-struct is_integral: std::integral_constant<bool, std::is_integral<T>::value && !is_bool<T>::value> {};
+struct is_integral: std::integral_constant<bool, std::is_integral<T>::value && !is_bool<T>::value>
+{};
 
 template<typename T>
-struct is_floating: std::is_floating_point<T> {};
+struct is_floating: std::is_floating_point<T>
+{};
 
 template<typename T>
-struct is_string: std::is_same<T, std::string> {};
+struct is_string: std::is_same<T, std::string>
+{};
+
+template<typename T>
+struct is_null: std::is_null_pointer<T>
+{};
+
+template<typename T>
+struct is_simple_type: std::integral_constant<
+         bool
+        ,is_bool<T>::value ||
+         is_integral<T>::value ||
+         is_floating<T>::value ||
+         is_string<T>::value ||
+         is_null<T>::value
+    >
+{};
+
+template<typename T>
+struct is_config_ctor_type: std::integral_constant<
+         bool
+        ,!is_simple_type<T>::value &&
+         std::is_constructible<T, const flatjson::fjson &>::value
+    >
+{};
 
 /***************************************************************************/
 
 // bool
 template<typename T>
 T get_value(
-     const T &
+     T *
     ,const char *key
     ,const flatjson::fjson &cfg
     ,const char *default_value
@@ -135,43 +164,43 @@ T get_value(
 // integrals
 template<typename T>
 T get_value(
-     const T &
+     T *
     ,const char *key
     ,const flatjson::fjson &cfg
     ,const char *default_value
     ,typename std::enable_if<is_integral<T>::value>::type* = nullptr)
 {
-    std::string val;
+    std::string str;
     if ( !default_value ) {
-        val = cfg.at(key).to_string();
+        str = cfg.at(key).to_string();
     } else {
-        val = !cfg.contains(key)
+        str = !cfg.contains(key)
             ? default_value
             : cfg.at(key).to_string()
         ;
     }
 
     std::int64_t mult = 1;
-    switch ( val.back() ) {
+    switch ( str.back() ) {
         case 't': case 'T': mult *= 1024; // fallthrough
         case 'g': case 'G': mult *= 1024; // fallthrough
         case 'm': case 'M': mult *= 1024; // fallthrough
         case 'k': case 'K': mult *= 1024; // fallthrough
 
-        val.pop_back();
+        str.pop_back();
     }
 
     if ( std::is_unsigned<T>::value ) {
-        return static_cast<T>(std::stoul(val) * mult);
-    } else {
-        return static_cast<T>(std::stol(val) * mult);
+        return static_cast<T>(std::stoul(str) * mult);
     }
+
+    return static_cast<T>(std::stol(str) * mult);
 }
 
 // floating
 template<typename T>
 T get_value(
-     const T &
+     T *
     ,const char *key
     ,const flatjson::fjson &cfg
     ,const char *default_value
@@ -201,7 +230,7 @@ Iterator find_if(Iterator beg, Iterator end, Pred pred) {
 // string
 template<typename T>
 T get_value(
-     const T &
+     T *
     ,const char *key
     ,const flatjson::fjson &cfg
     ,const char *default_value
@@ -331,6 +360,27 @@ T get_value(
     return res;
 }
 
+// any config-ctor type
+template<typename T>
+T get_value(
+     T *
+    ,const char *key
+    ,const flatjson::fjson &cfg
+    ,const char *default_value
+    ,typename std::enable_if<is_config_ctor_type<T>::value>::type* = nullptr)
+{
+    if ( !default_value ) {
+        return T{cfg.at(key)};
+    }
+
+    const flatjson::fjson json = !cfg.contains(key)
+        ? flatjson::fjson{default_value}
+        : cfg.at(key)
+    ;
+
+    return T{json};
+}
+
 /***************************************************************************/
 
 template<typename T>
@@ -358,6 +408,15 @@ void write_value(
     ,typename std::enable_if<is_string<T>::value>::type* = nullptr)
 {
     os << '\"' << v.c_str() << '\"';
+}
+
+template<typename T>
+void write_value(
+     std::ostream &os
+    ,const T &v
+    ,typename std::enable_if<is_config_ctor_type<T>::value>::type* = nullptr)
+{
+    v.dump(os);
 }
 
 /***************************************************************************/
@@ -407,29 +466,46 @@ inline void check_config_keys_for_object_keys(
     BOOST_PP_TUPLE_ELEM(0, elem) /* type */ BOOST_PP_TUPLE_ELEM(1, elem) /* var name */ ;
 
 #define __CONFIG_CTOR__INIT_MEMBERS_WITH_DEFAULT(...) \
-    ,BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2, __VA_ARGS__))
+    BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2, __VA_ARGS__))
 
 #define __CONFIG_CTOR__INIT_MEMBERS_WITHOUT_DEFAULT(...) \
-    ,nullptr
+    nullptr
 
-#define __CONFIG_CTOR__INIT_MEMBERS(unused, data, idx, elem) \
-    BOOST_PP_COMMA_IF(idx) \
+#define __CONFIG_CTOR__INIT_MEMBERS__BODY(varname, withdefault, elem) \
+    varname{ \
         ::config_ctor::details::get_value( \
-             BOOST_PP_TUPLE_ELEM(0, elem){} \
-            ,BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) \
-            ,cfg \
-            BOOST_PP_IF( \
-                 BOOST_PP_GREATER_EQUAL(BOOST_PP_TUPLE_SIZE(elem), 3) \
+             &varname \
+            ,BOOST_PP_STRINGIZE(varname)  \
+            ,json \
+            ,BOOST_PP_IF( \
+                 withdefault \
                 ,__CONFIG_CTOR__INIT_MEMBERS_WITH_DEFAULT \
                 ,__CONFIG_CTOR__INIT_MEMBERS_WITHOUT_DEFAULT \
             )(elem) \
-        )
+        ) \
+    }
+
+#define __CONFIG_CTOR__INIT_MEMBERS__COLON_CASE(varname, withdefault, elem) \
+    :__CONFIG_CTOR__INIT_MEMBERS__BODY(varname, withdefault, elem)
+
+#define __CONFIG_CTOR__INIT_MEMBERS__COMMA_CASE(varname, withdefault, elem) \
+    ,__CONFIG_CTOR__INIT_MEMBERS__BODY(varname, withdefault, elem)
+
+#define __CONFIG_CTOR__INIT_MEMBERS(unused, data, idx, elem) \
+    BOOST_PP_IF( \
+         idx \
+        ,__CONFIG_CTOR__INIT_MEMBERS__COMMA_CASE \
+        ,__CONFIG_CTOR__INIT_MEMBERS__COLON_CASE \
+    )( \
+         BOOST_PP_TUPLE_ELEM(1, elem) \
+        ,BOOST_PP_GREATER_EQUAL(BOOST_PP_TUPLE_SIZE(elem), 3)\
+        ,elem \
+    )
 
 #define __CONFIG_CTOR__ENUM_MEMBERS(unused, data, idx, elem) \
     BOOST_PP_IF(idx, os << "   ,";, os << "    ";) \
     os << "\"" BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(1, elem)) "\":"; \
-    ::config_ctor::details::write_value(os, BOOST_PP_TUPLE_ELEM(1, elem)); \
-    os << '\n';
+    ::config_ctor::details::write_value(os, BOOST_PP_TUPLE_ELEM(1, elem));
 
 /***************************************************************************/
 
@@ -459,11 +535,59 @@ inline void check_config_keys_for_object_keys(
     ); \
 }
 
+#define __CONFIG_CTOR__GENERATE_CTOR_ARGS(unused, data, idx, elem) \
+    BOOST_PP_COMMA_IF(idx) \
+        BOOST_PP_TUPLE_ELEM(0, elem) arg##idx
+
+#define __CONFIG_CTOR__GENERATE_INIT_LIST_COMMA_CASE(membername, argname) \
+    ,membername{std::move(argname)}
+
+#define __CONFIG_CTOR__GENERATE_INIT_LIST_COLON_CASE(membername, argname) \
+    :membername{std::move(argname)}
+
+#define __CONFIG_CTOR__GENERATE_INIT_LIST(unused, data, idx, elem) \
+    BOOST_PP_IF( \
+         idx \
+        ,__CONFIG_CTOR__GENERATE_INIT_LIST_COMMA_CASE \
+        ,__CONFIG_CTOR__GENERATE_INIT_LIST_COLON_CASE \
+    )( \
+         BOOST_PP_TUPLE_ELEM(1, elem) \
+        ,arg##idx \
+    )
+
 /***************************************************************************/
 
 #define __CONFIG_CTOR__GENERATE_STRUCT(name, seq, ...) \
     struct name { \
         __VA_ARGS__ /* user code will expanded here */ \
+        \
+        name() = default; \
+        name(const name &) = default; \
+        name(name &&) = default; \
+        name& operator= (const name &) = default; \
+        name& operator= (name &&) = default; \
+        \
+        name(const ::flatjson::fjson &json) \
+            BOOST_PP_SEQ_FOR_EACH_I( \
+                 __CONFIG_CTOR__INIT_MEMBERS \
+                ,name \
+                ,seq \
+            ) \
+        {} \
+        \
+        name( \
+            BOOST_PP_SEQ_FOR_EACH_I( \
+                 __CONFIG_CTOR__GENERATE_CTOR_ARGS \
+                ,~ \
+                ,seq \
+            ) \
+        ) \
+            BOOST_PP_SEQ_FOR_EACH_I( \
+                 __CONFIG_CTOR__GENERATE_INIT_LIST \
+                ,~ \
+                ,seq \
+            ) \
+        {} \
         \
         BOOST_PP_SEQ_FOR_EACH_I( \
              __CONFIG_CTOR__GENERATE_MEMBERS \
@@ -485,13 +609,7 @@ inline void check_config_keys_for_object_keys(
             \
             __CONFIG_CTOR__GENERATE_KEY_CHECKING(#name, keys, cfg, seq) \
             \
-            name res{ \
-                BOOST_PP_SEQ_FOR_EACH_I( \
-                     __CONFIG_CTOR__INIT_MEMBERS \
-                    ,name \
-                    ,seq \
-                ) \
-            }; \
+            name res{cfg}; \
             \
             ::config_ctor::details::call_after_read_proxy< \
                 ::config_ctor::details::has_member_function_after_read<void (name::*)(name &)>::value \
@@ -528,13 +646,13 @@ inline void check_config_keys_for_object_keys(
             return dump(os); \
         } \
         std::ostream& dump(std::ostream &os) const { \
-            os << "{\n"; \
+            os << "{"; \
             BOOST_PP_SEQ_FOR_EACH_I( \
                  __CONFIG_CTOR__ENUM_MEMBERS \
                 ,~ \
                 ,seq \
             ) \
-            os << "}\n"; \
+            os << "}"; \
             \
             return os; \
         } \

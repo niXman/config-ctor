@@ -128,7 +128,7 @@ namespace config_ctor {
 namespace details {
 
 double_type get_value(
-     const double_type &
+     double_type *
     ,const char *key
     ,const flatjson::fjson &cfg
     ,const char *default_value)
@@ -154,10 +154,16 @@ void write_value(std::ostream &os, const double_type &v) {
 int main() {
     {
         CONSTRUCT_CONFIG(
+            type,
+            (int, i)
+            (std::string, s)
+        )
+        CONSTRUCT_CONFIG(
             config,
             (int, a)
             (float, b)
             (std::string, c)
+            (type, t)
             (double_type, d)
         )
 
@@ -170,6 +176,7 @@ int main() {
              a
             ,b
             ,c
+            ,type{3, "33"}
             ,d
         };
 
@@ -181,6 +188,8 @@ int main() {
         assert(rcfg.a == a);
         assert(rcfg.b == b);
         assert(rcfg.c == c);
+        assert(rcfg.t.i == 3);
+        assert(rcfg.t.s == "33");
         assert(rcfg.d == d);
     }
 
