@@ -399,7 +399,7 @@ struct is_stl_container_like {
         ,typename A::const_iterator * pci = nullptr
         ,typename A::value_type * = nullptr)
     {
-        using iterator = typename A::iterato;
+        using iterator = typename A::iterator;
         using const_iterator = typename A::const_iterator;
         using value_type = typename A::value_type;
 
