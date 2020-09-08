@@ -3,16 +3,16 @@
 config-ctor
 ===========
 
-C++ preprocessor type constuctor for processing structured configuration files.
+C++ preprocessor type constuctor for processing structured (JSON) configuration files.
 
 Tutorial
 ===========
 Describe the info about options you need:
 ```cpp
 CONSTRUCT_CONFIG(
-	myconfig, // the name of the generated type(struct)
-	(int, a) // the sequence of the variables
-	(double, b)
+    myconfig, // the name of the generated type(struct)
+    (int, a) // the sequence of the variables
+    (double, b)
 )
 ```
 For read the options from file:
@@ -32,9 +32,9 @@ Default values
 You can specify the default values for options. To do this, specify the third parameter for that variable:
 ```cpp
 CONSTRUCT_CONFIG(
-	myconfig, // the name of the generated type(struct)
-	(int, a, 33) // the sequence of the variables
-	(double, b, 44.55)
+    myconfig, // the name of the generated type(struct)
+    (int, a, 33) // the sequence of the variables
+    (double, b, 44.55)
 )
 ```
 
