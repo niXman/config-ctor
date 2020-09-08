@@ -384,6 +384,119 @@ T get_value(
 /***************************************************************************/
 
 template<typename T>
+struct is_stl_container_like {
+    typedef typename std::remove_const<T>::type test_type;
+
+    template<typename A>
+    static constexpr bool test(
+         A * pt
+        ,A const * cpt = nullptr
+        ,decltype(pt->begin()) * = nullptr
+        ,decltype(pt->end()) * = nullptr
+        ,decltype(cpt->begin()) * = nullptr
+        ,decltype(cpt->end()) * = nullptr
+        ,typename A::iterator * pi = nullptr
+        ,typename A::const_iterator * pci = nullptr
+        ,typename A::value_type * = nullptr)
+    {
+        using iterator = typename A::iterato;
+        using const_iterator = typename A::const_iterator;
+        using value_type = typename A::value_type;
+
+        return
+            std::is_same<decltype(pt->begin()),iterator>::value &&
+            std::is_same<decltype(pt->end()),iterator>::value &&
+            std::is_same<decltype(cpt->begin()),const_iterator>::value &&
+            std::is_same<decltype(cpt->end()),const_iterator>::value &&
+            std::is_same<decltype(**pi),value_type &>::value &&
+            std::is_same<decltype(**pci),value_type const &>::value
+        ;
+    }
+
+    template<typename A>
+    static constexpr bool test(...) {
+        return false;
+    }
+
+    static const bool value = test<test_type>(nullptr);
+};
+
+template<typename Iterator, std::size_t N>
+void out_for_each(std::ostream &os, Iterator beg, Iterator end, const char(&delim)[N]) {
+    for ( ; beg != end; ++beg ) {
+        if ( is_string<typename std::iterator_traits<Iterator>::value_type>::value ) {
+            os << '\"';
+        }
+
+        os << *beg;
+
+        if ( is_string<typename std::iterator_traits<Iterator>::value_type>::value ) {
+            os << '\"';
+        }
+
+        if ( std::next(beg) != end ) {
+            os.write(delim, N - 1);
+        }
+    }
+}
+
+template<typename C>
+void get_value_container_proxy(
+     C &c
+    ,const flatjson::fjson &json
+    ,typename std::enable_if<is_simple_type<typename C::value_type>::value>::type* = nullptr)
+{
+    if ( !json.is_simple_type() ) {
+        throw std::runtime_error("SIMPLE type expected!");
+    }
+
+    c.push_back(json.to<typename C::value_type>());
+}
+
+template<typename C>
+void get_value_container_proxy(
+     C &c
+    ,const flatjson::fjson &json
+    ,typename std::enable_if<is_config_ctor_type<typename C::value_type>::value>::type* = nullptr)
+{
+    c.push_back(typename C::value_type{json});
+}
+
+template<typename T>
+T get_value(
+     T *
+    ,const char *key
+    ,const flatjson::fjson &cfg
+    ,const char *default_value
+    ,typename std::enable_if<is_stl_container_like<T>::value && !is_string<T>::value>::type* = nullptr)
+{
+    flatjson::fjson json;
+
+    if ( !default_value ) {
+        json = cfg.at(key);
+    } else {
+        json = !cfg.contains(key)
+            ? flatjson::fjson{default_value}
+            : cfg.at(key)
+        ;
+    }
+
+    if ( !json.is_array() ) {
+        throw std::runtime_error("ARRAY type expected!");
+    }
+
+    T res;
+    for ( std::size_t idx = 0u; idx < json.size(); ++idx ) {
+        const auto it = json.at(idx);
+        get_value_container_proxy(res, it);
+    }
+
+    return res;
+}
+
+/***************************************************************************/
+
+template<typename T>
 void write_value(
      std::ostream &os
     ,const T &v
@@ -417,6 +530,17 @@ void write_value(
     ,typename std::enable_if<is_config_ctor_type<T>::value>::type* = nullptr)
 {
     v.dump(os);
+}
+
+template<typename T>
+void write_value(
+     std::ostream &os
+    ,const T &v
+    ,typename std::enable_if<is_stl_container_like<T>::value && !is_string<T>::value>::type* = nullptr)
+{
+    os << '[';
+    out_for_each(os, v.begin(), v.end(), ", ");
+    os << ']';
 }
 
 /***************************************************************************/
@@ -658,6 +782,10 @@ inline void check_config_keys_for_object_keys(
         } \
     };
 
+template<typename T, typename = typename std::enable_if<::config_ctor::details::is_config_ctor_type<T>::value>::type>
+std::ostream& operator<< (std::ostream &os, const T &v) {
+    return v.dump(os);
+}
 /***************************************************************************/
 
 #define CONSTRUCT_CONFIG(\

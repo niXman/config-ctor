@@ -46,7 +46,7 @@
 /***************************************************************************/
 
 #define DUMP_CONFIG(os, ss, descr) \
-    os << "[" descr "]:" << std::endl; \
+    os << __FILE__ << '(' << __LINE__ << ")[" descr "]:" << std::endl; \
     os << ss.str() << std::endl;
 
 #define MY_ENV_TEST(env, exp) { \
@@ -182,7 +182,7 @@ int main() {
 
         std::stringstream ss;
         config::write(ss, wcfg);
-        DUMP_CONFIG(std::cout, ss, "test config dump")
+        DUMP_CONFIG(std::cout, ss, "dump for nested config-ctor types")
 
         const config rcfg = config::read(ss);
         assert(rcfg.a == a);
@@ -193,6 +193,80 @@ int main() {
         assert(rcfg.d == d);
     }
 
+    //////////////////////////////////////////////// containers test
+    {
+        static const int i = 3;
+        static const std::vector<int> v{0, 1, 2, 3};
+        CONSTRUCT_CONFIG(
+            config,
+            (int, i)
+            (std::vector<int>, v)
+        )
+
+        const config wcfg{
+             i
+            ,v
+        };
+
+        std::stringstream ss;
+        config::write(ss, wcfg);
+        DUMP_CONFIG(std::cout, ss, "dump for containers 0")
+
+        const config rcfg = config::read(ss);
+        assert(rcfg.i == i);
+        assert(rcfg.v == v);
+    }
+    {
+        const int i = 3;
+        const std::vector<std::string> v{"0", "1", "2", "3"};
+        CONSTRUCT_CONFIG(
+            config,
+            (int, i)
+            (std::vector<std::string>, v)
+        )
+
+        const config wcfg{
+             i
+            ,v
+        };
+
+        std::stringstream ss;
+        config::write(ss, wcfg);
+        DUMP_CONFIG(std::cout, ss, "dump for containers 1")
+
+        const config rcfg = config::read(ss);
+        assert(rcfg.i == i);
+        assert(rcfg.v == v);
+    }
+    {
+        CONSTRUCT_CONFIG(
+            type,
+            (int, i)
+        )
+
+        const std::vector<type> v{
+             flatjson::fjson{R"({"i":0})"}
+            ,flatjson::fjson{R"({"i":1})"}
+            ,flatjson::fjson{R"({"i":2})"}
+            ,flatjson::fjson{R"({"i":3})"}
+        };
+        CONSTRUCT_CONFIG(
+            config,
+            (std::vector<type>, v)
+        )
+
+        const config wcfg{v};
+
+        std::stringstream ss;
+        config::write(ss, wcfg);
+        DUMP_CONFIG(std::cout, ss, "dump for containers with config-ctor types")
+
+        const config rcfg = config::read(ss);
+        assert(rcfg.v.size() == v.size());
+        for ( auto it = rcfg.v.begin(), it2 = v.begin(); it != rcfg.v.end(); ++it, ++it2 ) {
+            assert(it->i == it2->i);
+        }
+    }
     //////////////////////////////////////////////// default value test
     {
         CONSTRUCT_CONFIG(
@@ -332,7 +406,7 @@ int main() {
 
         std::stringstream ss;
         config::write(ss, wcfg);
-        DUMP_CONFIG(std::cout, ss, "test config dump")
+        DUMP_CONFIG(std::cout, ss, "dump for \"after_read()\"/\"before_write()\"")
 
         config rcfg = config::read(ss);
         assert(rcfg.a == a);
