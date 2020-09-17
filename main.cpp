@@ -37,6 +37,7 @@
 
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
+#include <set>
 #include <iostream>
 
 #ifdef _WIN32
@@ -196,16 +197,19 @@ int main() {
     //////////////////////////////////////////////// containers test
     {
         static const int i = 3;
-        static const std::vector<int> v{0, 1, 2, 3};
+        static const std::vector<int> vec{0, 1, 2, 3};
+        static const std::set   <int> set{0, 1, 2, 3};
         CONSTRUCT_CONFIG(
             config,
             (int, i)
-            (std::vector<int>, v)
+            (std::vector<int>, vec)
+            (std::set<int>, set)
         )
 
         const config wcfg{
              i
-            ,v
+            ,vec
+            ,set
         };
 
         std::stringstream ss;
@@ -214,7 +218,8 @@ int main() {
 
         const config rcfg = config::read(ss);
         assert(rcfg.i == i);
-        assert(rcfg.v == v);
+        assert(rcfg.vec == vec);
+        assert(rcfg.set == set);
     }
     {
         const int i = 3;
