@@ -460,7 +460,7 @@ void get_value_container_proxy(
     ,const flatjson::fjson &json
     ,typename std::enable_if<is_config_ctor_type<typename C::value_type>::value>::type* = nullptr)
 {
-    c.push_back(typename C::value_type{json});
+    c.insert(c.end(), typename C::value_type{json});
 }
 
 template<typename T>
